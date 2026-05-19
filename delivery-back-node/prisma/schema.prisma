@@ -1,0 +1,127 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  admin
+  driver
+}
+
+enum UserStatus {
+  active
+  inactive
+  suspended
+}
+
+model User {
+  id                Int               @id @default(autoincrement())
+  name              String
+  email             String?           @unique
+  phone             String            @unique
+  pin               String
+  city              String            @default("Oruro")
+  role              Role              @default(driver)
+  status            UserStatus        @default(active)
+  points            Int               @default(0)
+  phone_verified_at DateTime?
+  email_verified_at DateTime?
+  password          String?
+  remember_token    String?
+  created_at        DateTime          @default(now())
+  updated_at        DateTime          @updatedAt
+  
+  wallet            Wallet?
+  assignments       OrderAssignment[]
+
+  @@map("users")
+}
+
+enum Urgency {
+  baja
+  media
+  alta
+}
+
+model Order {
+  id           Int               @id @default(autoincrement())
+  type         String            // ej: 'delivery', 'express'
+  client_name  String            @db.VarChar(100)
+  pickup       String            // Dirección de recogida
+  delivery     String            // Dirección de entrega
+  address      String?           @db.Text
+  delivery_fee Decimal           @db.Decimal(10, 2)
+  urgency      Urgency           @default(baja)
+  description  String?           @db.Text
+  currency     String            @default("BOB") @db.VarChar(3)
+  status       String            @default("pending") @db.VarChar(30)
+  duration     String?           @db.VarChar(30)
+  points       Int               @default(0)
+  created_at   DateTime          @default(now())
+  updated_at   DateTime          @updatedAt
+
+  assignments  OrderAssignment[]
+
+  @@map("orders")
+}
+
+model OrderAssignment {
+  id         Int      @id @default(autoincrement())
+  order_id   Int
+  user_id    Int
+  status     String   @default("pending") // pending, accepted, rejected, completed
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  order      Order    @relation(fields: [order_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@map("order_assignments")
+}
+
+model Wallet {
+  id         Int           @id @default(autoincrement())
+  user_id    Int           @unique
+  balance    Decimal       @default(0.00) @db.Decimal(15, 2)
+  created_at DateTime      @default(now())
+  updated_at DateTime      @updatedAt
+
+  user       User          @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  transactions Transaction[]
+
+  @@map("wallets")
+}
+
+model Transaction {
+  id         Int      @id @default(autoincrement())
+  wallet_id  Int
+  type       String   @db.VarChar(30) // deposit, withdrawal, payment, refund
+  amount     Decimal  @db.Decimal(15, 2)
+  reference  String?
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  wallet     Wallet   @relation(fields: [wallet_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@map("transactions")
+}
+
+model Zone {
+  id          Int      @id @default(autoincrement())
+  name        String
+  coordinates Json     // Array de puntos [[lat, lng], [lat, lng]...]
+  extra_rate  Decimal  @default(0) @db.Decimal(8, 2)
+  color       String   @default("#ff0000")
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  @@map("zones")
+}

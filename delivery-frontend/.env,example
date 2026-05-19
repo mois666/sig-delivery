@@ -1,0 +1,9 @@
+VITE_API_URL=https://dominio.com/api
+
+VITE_REVERB_APP_ID=11234
+VITE_REVERB_APP_KEY=xxxxxxxxxxxxxxxxxxxxx
+VITE_REVERB_APP_SECRET=yyyyyyyyyyyyyyyyyyyyy
+VITE_REVERB_HOST=dominio.com
+VITE_REVERB_PORT=8080
+VITE_REVERB_SCHEME=http
+VITE_REVERB_CLUSTER=mt1

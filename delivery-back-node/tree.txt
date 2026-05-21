@@ -1,0 +1,134 @@
+Listado de rutas de carpetas para el volumen OS
+El n�mero de serie del volumen es 00000074 CA13:0ED5
+C:.
+|   .env
+|   .env.example
+|   .gitignore
+|   docker-compose.yml
+|   package-lock.json
+|   package.json
+|   prisma.config.ts
+|   tree.txt
+|   tsconfig.json
+|   tuto.txt
+|   
++---dist
+|   |   index.js
+|   |   
+|   +---controllers
+|   |       auth.controller.js
+|   |       order.controller.js
+|   |       user.controller.js
+|   |       zone.controller.js
+|   |       
+|   +---lib
+|   |       prisma.js
+|   |       
+|   +---middlewares
+|   |       auth.js
+|   |       validate.js
+|   |       
+|   +---routes
+|   |       auth.routes.js
+|   |       index.js
+|   |       order.routes.js
+|   |       user.routes.js
+|   |       zone.routes.js
+|   |       
+|   +---schemas
+|   |       auth.schema.js
+|   |       order.schema.js
+|   |       user.schema.js
+|   |       zone.schema.js
+|   |       
+|   \---services
+|           geo.service.js
+|           
++---prisma
+|   |   schema.prisma
+|   |   seed.ts
+|   |   tsconfig.json
+|   |   
+|   \---migrations
+|       |   migration_lock.toml
+|       |   
+|       \---20260401213640_init
+|               migration.sql
+|               
+\---src
+    |   index.ts
+    |   
+    +---controllers
+    |       auth.controller.ts
+    |       order.controller.ts
+    |       user.controller.ts
+    |       zone.controller.ts
+    |       
+    +---lib
+    |       prisma.ts
+    |       
+    +---middlewares
+    |       auth.ts
+    |       validate.ts
+    |       
+    +---routes
+    |       auth.routes.ts
+    |       index.ts
+    |       order.routes.ts
+    |       user.routes.ts
+    |       zone.routes.ts
+    |       
+    +---schemas
+    |       auth.schema.ts
+    |       order.schema.ts
+    |       user.schema.ts
+    |       zone.schema.ts
+    |       
+    \---services
+            geo.service.ts
+            
+
+Mi .env
+PORT=4000
+# Prisma connection string (MySQL)
+DATABASE_URL="mysql://admin:admin123@localhost:3307/delivery_app"
+# JWT key for auth
+JWT_SECRET=super_secret_key_123_change_this_later
+# Redis connection string
+REDIS_URL="redis://localhost:6379"
+NODE_ENV=development
+ Mi docker:
+ services:
+  mysql:
+    image: mysql:8.0
+    container_name: delivery-node
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: delivery_app
+      MYSQL_USER: admin
+      MYSQL_PASSWORD: admin123
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+  redis:
+    image: redis:latest
+    container_name: delivery-redis
+    restart: always
+    ports:
+      - "6379:6379"
+
+volumes:
+  mysql_data:
+
+Quiero dockerizar el backend, con servios de postresql, redis, socket.io. nginx por detras. Sugerencias para definir mi backend.
+Mi frontend está react+vite y corre en el puerto 5173.
+y la api que consume por .env 
+VITE_API_URL=http://localhost:4000/api
+VITE_SOCKET_URL=http://localhost:4000
+
+
+VITE_API_KEY_GEOCODING=b07354c00c4e4ebca58287e315d1afeb
+VITE_GOOGLE_MAPS_API_KEY=AIzaSyDD6YYOAFypgXEmn6qyCdx_ua5k58ZRUkI

@@ -15,15 +15,15 @@ const server = http.createServer(app);
 // Configuración de Socket.io con CORS
 const io = new Server(server, {
   cors: {
-    origin: "*", // En producción, usa la URL de tu frontend
-    methods: ["GET", "POST"]
+    origin: process.env.FRONTEND_URL || "http://localhost:5173",
+    methods: ["GET", "POST"],
+    credentials: true,
   }
 });
 
-// Middleware
 app.use(cors({
-  origin: ["http://localhost:5173", "http://localhost:3000"], // Permite Vite y puertos comunes
-  credentials: true, // Necesario para recibir cookies
+  origin: process.env.FRONTEND_URL || "http://localhost:5173",
+  credentials: true,
 }));
 app.use(express.json());
 app.use(cookieParser());
@@ -55,7 +55,7 @@ io.on('connection', (socket) => {
 
       const result = await prisma.$transaction(async (tx: any) => {
         const order = await tx.order.findUnique({ where: { id: order_id } });
-        
+
         if (!order || order.status !== 'pending') {
           throw new Error('El pedido ya no está disponible');
         }

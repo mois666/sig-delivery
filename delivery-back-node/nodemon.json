@@ -1,0 +1,8 @@
+{
+  "watch": ["src", ".env"],
+  "ext": "ts,js,json",
+  "ignore": ["node_modules", "dist", "*.test.ts", "*.spec.ts"],
+  "execMap": {
+    "ts": "ts-node"
+  }
+}

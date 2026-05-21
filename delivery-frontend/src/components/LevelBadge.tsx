@@ -29,7 +29,7 @@ const LevelBadge = ({ level, totalPoints, size = 'md' }: LevelBadgeProps) => {
         {/* Outer glow ring */}
         <div className={cn(
           container,
-          'rounded-full gradient-gold flex items-center justify-center animate-pulse-glow relative'
+          'rounded-full bg-warning flex items-center justify-center relative shadow-lg shadow-warning/20'
         )}>
           {/* Progress ring */}
           <svg className="absolute inset-0 w-full h-full -rotate-90">
@@ -58,8 +58,8 @@ const LevelBadge = ({ level, totalPoints, size = 'md' }: LevelBadgeProps) => {
           
           {/* Inner content */}
           <div className="flex flex-col items-center">
-            <Star className={cn(star, 'text-accent-foreground')} fill="currentColor" />
-            <span className={cn(text, 'font-bold text-accent-foreground')}>{level}</span>
+            <Star className={cn(star, 'text-warning-foreground')} fill="currentColor" />
+            <span className={cn(text, 'font-bold text-warning-foreground')}>{level}</span>
           </div>
         </div>
 

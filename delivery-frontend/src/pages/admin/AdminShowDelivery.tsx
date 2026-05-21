@@ -63,7 +63,7 @@ export const AdminShowDelivery = () => {
                     initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
                     className="glass-card p-6 flex flex-col items-center text-center relative overflow-hidden"
                 >
-                    <div className="w-24 h-24 rounded-3xl gradient-primary flex items-center justify-center mb-4 glow-primary">
+                    <div className="w-24 h-24 rounded-3xl bg-primary flex items-center justify-center mb-4 shadow-lg shadow-primary/20">
                         <span className="text-3xl font-bold text-primary-foreground">
                             {delivery.name.charAt(0)}
                         </span>
@@ -120,7 +120,7 @@ export const AdminShowDelivery = () => {
                             <Button variant="secondary" className="w-full gap-2 text-xs">
                                 <History className="w-3 h-3" /> Ver Movimientos
                             </Button>
-                            <Button className="w-full gap-2 text-xs gradient-primary">
+                            <Button color="primary" className="w-full gap-2 text-xs">
                                 <Zap className="w-3 h-3" /> Ajustar Saldo
                             </Button>
                         </div>
@@ -129,7 +129,7 @@ export const AdminShowDelivery = () => {
                     <div className="glass-card p-4 space-y-4">
                         <div className="flex items-center gap-3">
                             {/* Boton para crear billetera */}
-                            <Button className="w-full gap-2 text-xs gradient-primary" onClick={handleCreateWallet}>
+                            <Button color="primary" className="w-full gap-2 text-xs" onClick={handleCreateWallet}>
                                 <Zap className="w-3 h-3" /> Crear Billetera
                             </Button>
                         </div>

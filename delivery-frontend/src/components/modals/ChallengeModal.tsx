@@ -266,7 +266,7 @@ export const ChallengeModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: 
                                     animate={{ opacity: 1 }}
                                     exit={{ opacity: 0 }}
                                     style={{
-                                      background: `radial-gradient(ellipse at 50% 0%, var(--color-primary-500, #ff8a00)18, transparent 70%)`,
+                                      background: `radial-gradient(ellipse at 50% 0%, var(--heroui-primary, #006FEE) 18%, transparent 70%)`,
                                       opacity: 0.15,
                                     }}
                                   />
@@ -404,47 +404,47 @@ export const ChallengeModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: 
                       <Label>Urgencia del Pedido</Label>
                       <div className="grid grid-cols-3 gap-3 mt-2">
                         {URGENCY_OPTIONS.map((u) => {
-                          const isActive = form.urgency === u.id;
-                          return (
-                            <motion.button
-                              key={u.id}
-                              type="button"
-                              onClick={() => setForm({ ...form, urgency: u.id as any })}
-                              whileTap={{ scale: 0.95 }}
-                              whileHover={{ scale: 1.02 }}
-                              transition={{ type: 'spring', stiffness: 400, damping: 20 }}
-                              className={cn(
-                                'relative flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all duration-300 cursor-pointer overflow-hidden',
-                                isActive
-                                  ? `bg-gradient-to-b ${u.color} ${u.borderActive}`
-                                  : 'border-divider bg-default-50 hover:bg-default-100'
-                              )}
-                            >
-                              <motion.span
-                                className="text-2xl"
-                                animate={isActive ? { scale: [1, 1.25, 1] } : { scale: 1 }}
-                                transition={{ duration: 0.4, ease: 'easeOut' }}
-                              >
-                                {u.icon}
-                              </motion.span>
-                              <div className="text-center">
-                                <p className={cn('text-xs font-black uppercase tracking-wider', isActive ? u.textActive : 'text-muted-foreground')}>
-                                  {u.label}
-                                </p>
-                                <p className="text-[10px] text-muted-foreground mt-0.5">{u.description}</p>
-                              </div>
-                              <AnimatePresence>
-                                {isActive && (
-                                  <motion.div
-                                    initial={{ opacity: 0, scale: 0 }}
-                                    animate={{ opacity: 1, scale: 1 }}
-                                    exit={{ opacity: 0, scale: 0 }}
-                                    className={cn('absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full', u.badge.split(' ')[0])}
-                                  />
-                                )}
-                              </AnimatePresence>
-                            </motion.button>
-                          );
+                           const isActive = form.urgency === u.id;
+                           return (
+                             <motion.button
+                               key={u.id}
+                               type="button"
+                               onClick={() => setForm({ ...form, urgency: u.id as any })}
+                               whileTap={{ scale: 0.95 }}
+                               whileHover={{ scale: 1.02 }}
+                               transition={{ type: 'spring', stiffness: 400, damping: 20 }}
+                               className={cn(
+                                 'relative flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all duration-300 cursor-pointer overflow-hidden',
+                                 isActive
+                                   ? `bg-gradient-to-b ${u.color} ${u.borderActive}`
+                                   : 'border-divider bg-default-50 hover:bg-default-100'
+                               )}
+                             >
+                               <motion.span
+                                 className="text-2xl"
+                                 animate={isActive ? { scale: [1, 1.25, 1] } : { scale: 1 }}
+                                 transition={{ duration: 0.4, ease: 'easeOut' }}
+                               >
+                                 {u.icon}
+                               </motion.span>
+                               <div className="text-center">
+                                 <p className={cn('text-xs font-black uppercase tracking-wider', isActive ? u.textActive : 'text-muted-foreground')}>
+                                   {u.label}
+                                 </p>
+                                 <p className="text-[10px] text-muted-foreground mt-0.5">{u.description}</p>
+                                </div>
+                               <AnimatePresence>
+                                 {isActive && (
+                                   <motion.div
+                                     initial={{ opacity: 0, scale: 0 }}
+                                     animate={{ opacity: 1, scale: 1 }}
+                                     exit={{ opacity: 0, scale: 0 }}
+                                     className={cn('absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full', u.badge.split(' ')[0])}
+                                   />
+                                 )}
+                               </AnimatePresence>
+                             </motion.button>
+                           );
                         })}
                       </div>
                     </div>
@@ -493,12 +493,8 @@ export const ChallengeModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: 
                       isDisabled={!isFormValid || loading}
                       isLoading={loading}
                       size="lg"
-                      className={cn(
-                        'w-full h-14 font-black rounded-xl text-lg transition-all',
-                        !isFormValid
-                          ? 'bg-default-100 text-default-400 cursor-not-allowed'
-                          : 'bg-primary text-white shadow-lg shadow-primary/20'
-                      )}
+                      color={isFormValid ? "primary" : "default"}
+                      className="w-full h-14 font-black rounded-xl text-lg transition-all shadow-lg"
                     >
                       {loading ? 'PROCESANDO...' : calculating ? 'ESPERE...' : 'CREAR CARRERA'}
                     </Button>

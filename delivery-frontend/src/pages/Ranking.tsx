@@ -28,8 +28,8 @@ const Ranking = () => {
       {/* Header */}
       <div className="glass-card border-b border-border/50 px-4 py-6">
         <div className="flex items-center gap-3 mb-6">
-          <div className="w-12 h-12 rounded-full gradient-gold flex items-center justify-center glow-gold">
-            <Trophy className="w-6 h-6 text-accent-foreground" />
+          <div className="w-12 h-12 rounded-full bg-warning/20 text-warning flex items-center justify-center shadow-inner">
+            <Trophy className="w-6 h-6 text-warning" />
           </div>
           <div>
             <h1 className="text-xl font-display font-bold text-foreground">Ranking</h1>
@@ -46,7 +46,7 @@ const Ranking = () => {
               className={cn(
                 'flex-1 py-2.5 rounded-lg text-sm font-medium transition-all touch-target',
                 currentPeriod === period
-                  ? 'gradient-primary text-primary-foreground'
+                  ? 'bg-primary text-primary-foreground'
                   : 'text-muted-foreground hover:text-foreground'
               )}
             >
@@ -68,7 +68,7 @@ const Ranking = () => {
           </div>
           <div className="h-3 bg-muted rounded-full overflow-hidden">
             <motion.div
-              className="h-full gradient-gold rounded-full"
+              className="h-full bg-warning rounded-full"
               initial={{ width: 0 }}
               animate={{ width: `${Math.min(progressToReward, 100)}%` }}
               transition={{ duration: 1, ease: 'easeOut' }}

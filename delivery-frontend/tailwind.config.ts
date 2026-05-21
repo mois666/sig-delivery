@@ -17,36 +17,6 @@ export default {
   },
   darkMode: "class",
   plugins: [
-    heroui({
-      addCommonColors: true,
-      themes: {
-        light: {
-          colors: {
-            background: "#FFFFFF",
-            foreground: "#11181C",
-            primary: {
-              DEFAULT: "#FF8A00",
-              foreground: "#FFFFFF",
-            },
-            focus: "#FF8A00",
-          },
-        },
-        dark: {
-          colors: {
-            background: "#050505",
-            foreground: "#ECEDEE",
-            primary: {
-              DEFAULT: "#FF8A00",
-              foreground: "#FFFFFF",
-            },
-            focus: "#FF8A00",
-            content1: "#0A0A0A",
-            content2: "#141414",
-            content3: "#1C1C1C",
-            content4: "#262626",
-          },
-        },
-      },
-    }),
+    heroui(),
   ],
 };

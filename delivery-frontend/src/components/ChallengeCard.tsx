@@ -70,7 +70,7 @@ const ChallengeCard = ({ order, onAccept }: ChallengeCardProps) => {
       {/* Rewards */}
       <div className="flex items-center gap-4 mb-4">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-full gradient-primary flex items-center justify-center">
+          <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
             <span className="text-xs font-bold text-primary-foreground">Bs</span>
           </div>
           <div>
@@ -82,8 +82,8 @@ const ChallengeCard = ({ order, onAccept }: ChallengeCardProps) => {
         <div className="w-px h-8 bg-border" />
 
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-full gradient-gold flex items-center justify-center">
-            <Star className="w-4 h-4 text-accent-foreground" />
+          <div className="w-8 h-8 rounded-full bg-warning flex items-center justify-center">
+            <Star className="w-4 h-4 text-warning-foreground" />
           </div>
           <div>
             <div className="text-lg font-bold text-foreground">
@@ -100,7 +100,8 @@ const ChallengeCard = ({ order, onAccept }: ChallengeCardProps) => {
       {/* Accept Button */}
       <Button
         onClick={() => onAccept(order.id)}
-        className="w-full text-primary-foreground font-bold h-12 touch-target glow-primary"
+        color="primary"
+        className="w-full font-bold h-12 touch-target shadow-lg shadow-primary/20"
       >
         <span>Aceptar Entrega</span>
         <ChevronRight className="w-5 h-5 ml-2" />

@@ -178,11 +178,8 @@ const ActiveDelivery = () => {
         <Button
           onClick={handleUpdateStatus}
           disabled={isCompleting || activeOrder.status === 'delivered'}
-          className={`w-full h-14 text-lg font-bold rounded-xl touch-target ${
-            activeOrder.status === 'on_the_way'
-              ? 'gradient-gold text-accent-foreground glow-gold'
-              : 'gradient-primary text-primary-foreground glow-primary'
-          }`}
+          color={activeOrder.status === 'on_the_way' ? 'warning' : 'primary'}
+          className="w-full h-14 text-lg font-bold rounded-xl touch-target"
         >
           {activeOrder.status === 'on_the_way' ? (
             <CheckCircle className="w-5 h-5 mr-2" />

@@ -39,7 +39,7 @@ const Wallet = () => {
           animate={{ opacity: 1, y: 0 }}
           className="glass-card p-6 relative overflow-hidden"
         >
-          <div className="absolute top-0 right-0 w-32 h-32 gradient-primary opacity-10 rounded-full blur-3xl" />
+          <div className="absolute top-0 right-0 w-32 h-32 bg-primary opacity-10 rounded-full blur-3xl" />
           
           <div className="flex items-start justify-between mb-4">
             <div>
@@ -48,8 +48,8 @@ const Wallet = () => {
                 Bs {balance}
               </h2>
             </div>
-            <div className="w-12 h-12 rounded-full gradient-primary flex items-center justify-center glow-primary">
-              <WalletIcon className="w-6 h-6 text-primary-foreground" />
+            <div className="w-12 h-12 rounded-full bg-primary/20 text-primary flex items-center justify-center shadow-inner">
+              <WalletIcon className="w-6 h-6 text-primary" />
             </div>
           </div>
 
@@ -62,7 +62,7 @@ const Wallet = () => {
             </div>
           </div>
 
-          <Button className="w-full mt-4 h-12 gradient-primary text-primary-foreground font-semibold touch-target">
+          <Button color="primary" className="w-full mt-4 h-12 font-semibold touch-target">
             <ArrowUpRight className="w-4 h-4 mr-2" />
             Retirar fondos
           </Button>
@@ -75,7 +75,7 @@ const Wallet = () => {
           transition={{ delay: 0.1 }}
           className="glass-card p-4 relative overflow-hidden"
         >
-          <div className="absolute top-0 right-0 w-24 h-24 gradient-gold opacity-10 rounded-full blur-3xl" />
+          <div className="absolute top-0 right-0 w-24 h-24 bg-warning opacity-10 rounded-full blur-3xl" />
           
           <div className="flex items-center justify-between">
             <div>
@@ -108,7 +108,7 @@ const Wallet = () => {
               className={cn(
                 'px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all touch-target',
                 filter === filterType
-                  ? 'gradient-primary text-primary-foreground'
+                  ? 'bg-primary text-primary-foreground'
                   : 'bg-muted text-muted-foreground hover:bg-muted/80'
               )}
             >

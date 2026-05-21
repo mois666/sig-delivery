@@ -23,7 +23,7 @@ const StatusTimeline = ({ currentStatus }: StatusTimelineProps) => {
       {/* Progress line */}
       <div className="absolute left-[10%] right-[10%] top-5 h-1 bg-secondary rounded-full">
         <motion.div
-          className="h-full gradient-primary rounded-full"
+          className="h-full bg-primary rounded-full"
           initial={{ width: 0 }}
           animate={{ width: `${(currentIndex / (steps.length - 1)) * 100}%` }}
           transition={{ duration: 0.5, ease: 'easeOut' }}
@@ -42,7 +42,7 @@ const StatusTimeline = ({ currentStatus }: StatusTimelineProps) => {
               animate={{ scale: isCurrent ? 1.1 : 1 }}
               className={cn(
                 'w-10 h-10 rounded-full flex items-center justify-center transition-colors duration-300',
-                isCompleted ? 'gradient-primary glow-primary' : 'bg-secondary',
+                isCompleted ? 'bg-primary shadow-lg shadow-primary/20' : 'bg-secondary',
                 isCurrent && 'ring-4 ring-primary/30'
               )}
             >

@@ -25,7 +25,7 @@ const RankingCard = ({ entry, isCurrentUser, animationDelay = 0 }: RankingCardPr
   const TrendIcon = trendIcons[entry.trend];
   
   const getRankBadge = () => {
-    if (entry.rank === 1) return { className: 'gradient-gold', icon: Trophy };
+    if (entry.rank === 1) return { className: 'bg-warning', icon: Trophy };
     if (entry.rank === 2) return { className: 'bg-gray-400', icon: Trophy };
     if (entry.rank === 3) return { className: 'bg-amber-700', icon: Trophy };
     return null;
@@ -40,7 +40,7 @@ const RankingCard = ({ entry, isCurrentUser, animationDelay = 0 }: RankingCardPr
       transition={{ delay: animationDelay, duration: 0.3 }}
       className={cn(
         'glass-card p-4 flex items-center gap-4',
-        isCurrentUser && 'ring-2 ring-primary glow-primary'
+        isCurrentUser && 'ring-2 ring-primary shadow-lg shadow-primary/20'
       )}
     >
       {/* Rank */}
@@ -62,7 +62,7 @@ const RankingCard = ({ entry, isCurrentUser, animationDelay = 0 }: RankingCardPr
       {/* Avatar & Name */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center">
+          <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center">
             <span className="text-sm font-bold text-primary-foreground">
               {entry.name.charAt(0)}
             </span>

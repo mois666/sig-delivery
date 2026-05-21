@@ -306,7 +306,8 @@ export const ZoneModal = ({ isOpen, onClose, onSubmit, initialData }: ZoneModalP
                                                 type="submit"
                                                 isDisabled={form.coordinates.length < 3}
                                                 size="lg"
-                                                className="flex-[2] h-12 bg-primary font-black text-white rounded-xl shadow-lg shadow-primary/20"
+                                                color="primary"
+                                                className="flex-[2] h-12 font-black text-white rounded-xl shadow-lg shadow-primary/20"
                                             >
                                                 <Save className="w-4 h-4 mr-1" />
                                                 {initialData ? 'Guardar Cambios' : 'Crear Zona'}

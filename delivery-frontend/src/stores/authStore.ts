@@ -3,122 +3,99 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { appDB } from '@/api/appDB';
 import { isAxiosError } from 'axios';
 import { toast } from 'sonner';
+import { ICity } from '@/interfaces/city-interface';
 
-export type UserRole = 'admin' | 'driver';
+export type UserRole = 'super_admin' | 'admin' | 'driver' | 'client';
 
 export interface User {
-  id: string;
-  name: string;
-  phone: string;
-  role: UserRole;
-  city: string;
-  avatar?: string;
-  level: number;
-  totalPoints: number;
+  id:     string;
+  name:   string;
+  phone:  string;
+  email?: string;
+  role:   UserRole;
+  city:   ICity;   // objeto completo de la ciudad
+  level?: number;
+  totalPoints?: number;
+  transport_type?: string;
 }
 
 interface AuthState {
-  accessToken: string | null; // Solo en memoria (RAM)
-  user: User | null;
-  city: string | null;
+  accessToken:     string | null;
+  user:            User | null;
   isAuthenticated: boolean;
-  isLoading: boolean;
-  error: string | null;
+  isLoading:       boolean;
+  error:           string | null;
 
-  // Acciones
-  login: (credentials: { phone: string; pin: string; city: string }) => Promise<boolean>;
-  setAuth: (user: User, token: string, city: string) => void;
-  toggleRole: () => void;
-  logout: () => void;
+  login:     (credentials: { phone: string; pin: string; city_id: number }) => Promise<boolean>;
+  setAuth:   (user: User, token: string) => void;
+  logout:    () => void;
   clearError: () => void;
 }
 
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
-      accessToken: null, // Inicia nulo siempre
-      user: null,
-      city: null,
+      accessToken:     null,
+      user:            null,
       isAuthenticated: false,
-      isLoading: false,
-      error: null,
+      isLoading:       false,
+      error:           null,
 
-      // Acción para actualizar sesión (usada por Login y AuthProvider)
-      setAuth: (user, token, city) => set({
+      setAuth: (user, token) => set({
         user,
-        accessToken: token,
-        city,
+        accessToken:     token,
         isAuthenticated: true,
-        isLoading: false,
-        error: null
+        isLoading:       false,
+        error:           null,
       }),
 
-      login: async ({ phone, pin, city }) => {
+      login: async ({ phone, pin, city_id }) => {
         set({ isLoading: true, error: null });
         try {
-          // Petición al backend Laravel
-          const { data } = await appDB.post("/auth/login", { phone, pin });
+          const { data } = await appDB.post('/auth/login', { phone, pin });
 
-          // data.accessToken viene en el JSON, el refreshToken viene en Cookie HttpOnly
-          get().setAuth(
-            { ...data.user}, 
-            data.accessToken,
-            city // Proviene del formulario de login
-          ); 
+          // El backend devuelve user con la relación city completa
+          const userWithCity: User = {
+            ...data.user,
+            // Si el backend ya trae city como objeto, lo usamos directamente.
+            // Si no (por compatibilidad), creamos un objeto mínimo desde city_id.
+            city: data.user.city ?? { id: city_id, name: '', country: 'Bolivia', currency: 'BOB' },
+          };
 
-          toast.success(`Bienvenido ${data.user.name}`);
+          get().setAuth(userWithCity, data.accessToken);
+          toast.success(`Bienvenido ${data.user.name} — ${userWithCity.city.name}`);
           return true;
         } catch (error) {
           set({ isLoading: false });
           if (isAxiosError(error)) {
-            const message = error.response?.data.message || "Error al iniciar sesión";
+            const message = error.response?.data.message || 'Error al iniciar sesión';
             set({ error: message });
-            toast.error("Error", { description: message });
+            toast.error('Error', { description: message });
           }
           return false;
         }
       },
 
-      toggleRole: () => {
-        const currentUser = get().user;
-        if (!currentUser) return;
-        const newRole: UserRole = currentUser.role === 'admin' ? 'driver' : 'admin';
-        set({ user: { ...currentUser, role: newRole } });
-      },
-
       logout: () => {
-        // 1. Limpiar el estado local inmediatamente
         set({
-          accessToken: null,
-          user: null,
-          city: null,
+          accessToken:     null,
+          user:            null,
           isAuthenticated: false,
-          error: null
+          error:           null,
         });
-
-        // 2. Intentar avisar al servidor, pero usando una instancia limpia o 
-        // simplemente ignorando si falla (ya que localmente ya cerramos sesión)
-        appDB.post(`/auth/logout`, {}, {
-          withCredentials: true
-        }).catch(() => {
-          console.log("Sesión finalizada solo localmente");
-        });
-
-        // Opcional: Limpiar el localStorage si quieres ser drástico
+        appDB.post('/auth/logout', {}, { withCredentials: true }).catch(() => {});
         localStorage.removeItem('auth-storage');
         window.location.reload();
       },
+
       clearError: () => set({ error: null }),
     }),
     {
-      name: 'auth-storage',
+      name:    'auth-storage',
       storage: createJSONStorage(() => localStorage),
-      // IMPORTANTE: Solo persistimos el usuario y el estado de auth.
-      // El accessToken se excluye automáticamente al no estar en esta lista.
       partialize: (state) => ({
-        user: state.user,
-        city: state.city,
-        isAuthenticated: state.isAuthenticated
+        user:            state.user,
+        isAuthenticated: state.isAuthenticated,
       }),
     }
   )

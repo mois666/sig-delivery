@@ -3,6 +3,7 @@ import { IOrder, OrderStatus, IAddOrder } from '@/interfaces/orders-interface';
 import { appDB } from '@/api/appDB';
 import axios from 'axios';
 import { toast } from 'sonner';
+import { useAuthStore } from '@/stores/authStore';
 
 interface OrderState {
   orders: [];
@@ -56,7 +57,9 @@ export const useOrderStore = create<OrderState>((set, get) => ({
    */
   addOrder: async (orderData: IAddOrder) => {
     try {
-      const { data } = await appDB.post<IAddOrder>('/orders', orderData);
+      const user = useAuthStore.getState().user;
+      const city_id = user?.city?.id ?? 1;
+      const { data } = await appDB.post<IAddOrder>('/orders', { ...orderData, city_id });
       set((state) => ({
         availableOrders: [data, ...state.availableOrders],
       }));

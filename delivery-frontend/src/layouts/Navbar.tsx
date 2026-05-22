@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import { useTheme } from "next-themes";
 
 export const TopNavbar = () => {
-  const { user, logout } = useAuthStore();
+  const { user, logout, isAuthenticated } = useAuthStore();
   const { theme, setTheme } = useTheme();
   const { isConnected } = useSocketStore();
 
@@ -23,7 +23,16 @@ export const TopNavbar = () => {
             <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
               <Rocket className="w-5 h-5 text-white" />
             </div>
-            <span className="text-lg font-black font-display text-foreground tracking-tighter hidden sm:block">DRIVECORE</span>
+            <div className="hidden sm:flex flex-col leading-none">
+              <span className="text-lg font-black font-display text-foreground tracking-tighter uppercase">
+                {isAuthenticated && user?.city?.name ? user.city.name : 'DRIVECORE'}
+              </span>
+              {isAuthenticated && user?.city?.name && (
+                <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">
+                  DRIVECORE
+                </span>
+              )}
+            </div>
           </div>
 
           <div className="hidden md:flex items-center relative max-w-sm w-full group">

@@ -14,6 +14,9 @@ export class AuthController {
     try {
       const user = await prisma.user.findUnique({
         where: { phone },
+        include: {
+          city: { select: { id: true, name: true, country: true, currency: true } },
+        },
       });
 
       if (!user) {
@@ -29,7 +32,7 @@ export class AuthController {
       }
 
       const accessToken = jwt.sign(
-        { id: user.id, phone: user.phone, role: user.role },
+        { id: user.id, phone: user.phone, role: user.role, city_id: user.city_id },
         JWT_SECRET,
         { expiresIn: ACCESS_TOKEN_EXPIRY }
       );
@@ -44,13 +47,10 @@ export class AuthController {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
-        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+        maxAge: 7 * 24 * 60 * 60 * 1000,
       });
 
-      return res.json({
-        user,
-        accessToken,
-      });
+      return res.json({ user, accessToken });
     } catch (error) {
       return res.status(500).json({ message: 'Error en el servidor' });
     }
@@ -65,22 +65,22 @@ export class AuthController {
 
     try {
       const decoded = jwt.verify(refreshToken, JWT_SECRET) as any;
-      const user = await prisma.user.findUnique({ where: { id: decoded.id } });
+      const user = await prisma.user.findUnique({
+        where: { id: decoded.id },
+        include: { city: { select: { id: true, name: true, country: true, currency: true } } },
+      });
 
       if (!user) {
         return res.status(401).json({ message: 'Usuario no encontrado' });
       }
 
       const newAccessToken = jwt.sign(
-        { id: user.id, phone: user.phone, role: user.role },
+        { id: user.id, phone: user.phone, role: user.role, city_id: user.city_id },
         JWT_SECRET,
         { expiresIn: ACCESS_TOKEN_EXPIRY }
       );
 
-      return res.json({
-        user,
-        accessToken: newAccessToken,
-      });
+      return res.json({ user, accessToken: newAccessToken });
     } catch (error) {
       return res.status(401).json({ message: 'Token de refresco inválido' });
     }

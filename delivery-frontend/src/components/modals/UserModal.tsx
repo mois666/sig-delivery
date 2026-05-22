@@ -1,54 +1,58 @@
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { Loader2, X, UserPlus, Edit3 } from 'lucide-react';
+import { UserPlus, Edit3 } from 'lucide-react';
 import { Button, Modal, Input, Select, Label, ListBox, Form, Fieldset, TextField, FieldError } from '@heroui/react';
 import { IUser } from '@/interfaces/users-interface';
+import { useCityStore } from '@/stores/cityStore';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
 interface UserModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSubmit: (data: any) => void;
-  user?: IUser | null;
+  isOpen:    boolean;
+  onClose:   () => void;
+  onSubmit:  (data: any) => void;
+  user?:     IUser | null;
 }
 
 const STATUS_OPTIONS = [
-  { id: 'active', label: 'Activo' },
-  { id: 'inactive', label: 'Inactivo' },
-  { id: 'suspended', label: 'Suspendido' },
+  { id: 'active',    label: 'Activo'      },
+  { id: 'inactive',  label: 'Inactivo'    },
+  { id: 'suspended', label: 'Suspendido'  },
 ];
 
 const ROLE_OPTIONS = [
-  { id: 'admin', label: 'Administrador' },
-  { id: 'driver', label: 'Repartidor' },
-  { id: 'client', label: 'Cliente' },
+  { id: 'admin',  label: 'Administrador' },
+  { id: 'driver', label: 'Repartidor'    },
+  { id: 'client', label: 'Cliente'       },
 ];
 
-const CITIES = ["Oruro", "La Paz", "Cochabamba", "Santa Cruz", "Potosí", "Sucre", "Tarija", "Beni", "Pando"].map(c => ({ label: c, id: c }));
+const TRANSPORT_OPTIONS = [
+  { id: 'on_foot',    label: '🚶 A Pie'       },
+  { id: 'bike',       label: '🚲 Bicicleta'   },
+  { id: 'motorcycle', label: '🏍️ Moto'        },
+  { id: 'car',        label: '🚗 Automóvil'   },
+];
 
 const COUNTRY_CODES = [
-  { id: "+591", label: "🇧🇴 +591" },
-  { id: "+54", label: "🇦🇷 +54" },
-  { id: "+56", label: "🇨🇱 +56" },
-  { id: "+51", label: "🇵🇪 +51" },
+  { id: '+591', label: '🇧🇴 +591' },
+  { id: '+54',  label: '🇦🇷 +54'  },
+  { id: '+56',  label: '🇨🇱 +56'  },
+  { id: '+51',  label: '🇵🇪 +51'  },
 ];
 
+/** Extrae el primer valor de cualquier tipo de selección de HeroUI de forma segura */
 const getValueFromSelection = (value: any): string => {
   if (!value) return '';
   if (value instanceof Set) {
     const arr = Array.from(value);
     return arr[0] ? String(arr[0]) : '';
   }
-  if (typeof value === 'string') {
-    return value;
-  }
+  if (typeof value === 'string') return value;
   if (typeof value === 'object') {
     if (typeof value[Symbol.iterator] === 'function') {
       const arr = Array.from(value);
       if (arr.length > 0) return String(arr[0]);
     } else if ('anchorKey' in value) {
-      return String(value.anchorKey);
+      return String((value as any).anchorKey);
     }
   }
   return String(value);
@@ -56,31 +60,44 @@ const getValueFromSelection = (value: any): string => {
 
 export const UserModal = ({ isOpen, onClose, onSubmit, user }: UserModalProps) => {
   const [isLoading, setIsLoading] = useState(false);
+  const { cities, fetchCities }   = useCityStore();
+
   const [form, setForm] = useState({
-    countryCode: new Set(['+591']),
-    city: new Set(['Oruro']),
-    status: new Set(['active']) as any,
-    role: new Set(['driver']) as any
+    countryCode:    new Set(['+591']),
+    city_id:        new Set(['1']),
+    status:         new Set(['active'])     as any,
+    role:           new Set(['driver'])     as any,
+    transport_type: new Set(['motorcycle']) as any,
   });
 
+  // Cargar ciudades si no están cargadas
+  useEffect(() => {
+    if (cities.length === 0) fetchCities();
+  }, []);
+
+  // Cuando se abre el modal o cambia el usuario, sincronizar form
   useEffect(() => {
     if (user) {
       setForm({
-        countryCode: new Set(['+591']),
-        city: new Set([user.city]),
-        status: new Set([user.status]),
-        role: new Set([user.role || 'driver'])
+        countryCode:    new Set(['+591']),
+        city_id:        new Set([String(user.city_id || 1)]),
+        status:         new Set([user.status]),
+        role:           new Set([user.role || 'driver']),
+        transport_type: new Set([user.transport_type || 'motorcycle']),
       });
     } else {
+      const firstCityId = cities.length > 0 ? String(cities[0].id) : '1';
       setForm({
-        countryCode: new Set(['+591']),
-        city: new Set(['Oruro']),
-        status: new Set(['active']),
-        role: new Set(['driver'])
+        countryCode:    new Set(['+591']),
+        city_id:        new Set([firstCityId]),
+        status:         new Set(['active']),
+        role:           new Set(['driver']),
+        transport_type: new Set(['motorcycle']),
       });
     }
-  }, [user, isOpen]);
+  }, [user, isOpen, cities]);
 
+  /** Actualiza un campo del form garantizando un Set<string> limpio */
   const updateFieldSelection = (field: string, keys: any) => {
     let nextSet: Set<string>;
     if (keys instanceof Set) {
@@ -108,9 +125,7 @@ export const UserModal = ({ isOpen, onClose, onSubmit, user }: UserModalProps) =
 
     const formData = new FormData(e.currentTarget);
     const data: Record<string, string> = {};
-    formData.forEach((value, key) => {
-      data[key] = value.toString();
-    });
+    formData.forEach((value, key) => { data[key] = value.toString(); });
 
     const phoneRegex = /^\d{8,12}$/;
     if (!data.name || !data.phone || !data.email || (!user && !data.pin) || !phoneRegex.test(data.phone)) {
@@ -119,13 +134,14 @@ export const UserModal = ({ isOpen, onClose, onSubmit, user }: UserModalProps) =
     }
 
     const payload = {
-      name: data.name,
-      email: data.email,
-      pin: data.pin || undefined,
-      role: getValueFromSelection(form.role),
-      city: getValueFromSelection(form.city),
-      status: getValueFromSelection(form.status),
-      phone: `${getValueFromSelection(form.countryCode)}${data.phone}`
+      name:           data.name,
+      email:          data.email,
+      pin:            data.pin || undefined,
+      role:           getValueFromSelection(form.role),
+      city_id:        parseInt(getValueFromSelection(form.city_id)),
+      transport_type: getValueFromSelection(form.transport_type),
+      status:         getValueFromSelection(form.status),
+      phone:          `${getValueFromSelection(form.countryCode)}${data.phone}`,
     };
 
     onSubmit(payload);
@@ -152,12 +168,13 @@ export const UserModal = ({ isOpen, onClose, onSubmit, user }: UserModalProps) =
               <Modal.Body className="p-6">
                 <Fieldset className="w-full">
                   <Fieldset.Group>
+                    {/* Nombre */}
                     <TextField
                       isRequired
                       name="name"
                       defaultValue={user?.name || ''}
                       validate={(value) => {
-                        if (!value || value.length < 3) return "Mínimo 3 caracteres";
+                        if (!value || value.length < 3) return 'Mínimo 3 caracteres';
                         return null;
                       }}
                     >
@@ -166,6 +183,7 @@ export const UserModal = ({ isOpen, onClose, onSubmit, user }: UserModalProps) =
                       <FieldError />
                     </TextField>
 
+                    {/* Email */}
                     <TextField
                       isRequired
                       name="email"
@@ -173,7 +191,7 @@ export const UserModal = ({ isOpen, onClose, onSubmit, user }: UserModalProps) =
                       defaultValue={user?.email || ''}
                       validate={(value) => {
                         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-                        if (!value || !emailRegex.test(value)) return "Correo electrónico inválido";
+                        if (!value || !emailRegex.test(value)) return 'Correo electrónico inválido';
                         return null;
                       }}
                     >
@@ -182,6 +200,7 @@ export const UserModal = ({ isOpen, onClose, onSubmit, user }: UserModalProps) =
                       <FieldError />
                     </TextField>
 
+                    {/* Teléfono */}
                     <div className="flex gap-4">
                       <Select
                         selectedKeys={form.countryCode}
@@ -212,7 +231,7 @@ export const UserModal = ({ isOpen, onClose, onSubmit, user }: UserModalProps) =
                         defaultValue={user ? user.phone.replace(/^\+(591|54|56|51)/, '') : ''}
                         validate={(value) => {
                           const phoneRegex = /^\d{8,12}$/;
-                          if (!phoneRegex.test(value)) return "Número inválido";
+                          if (!phoneRegex.test(value)) return 'Número inválido';
                           return null;
                         }}
                         className="flex-1"
@@ -223,25 +242,28 @@ export const UserModal = ({ isOpen, onClose, onSubmit, user }: UserModalProps) =
                       </TextField>
                     </div>
 
+                    {/* PIN + Ciudad */}
                     <div className="grid grid-cols-2 gap-4">
                       <TextField
                         isRequired={!user}
                         name="pin"
                         validate={(value) => {
-                          if (!user && value.length !== 4) return "PIN de 4 dígitos";
+                          if (!user && value.length !== 4) return 'PIN de 4 dígitos';
                           return null;
                         }}
                       >
-                        <Label>{user ? "Nuevo PIN (Opcional)" : "PIN Inicial"}</Label>
+                        <Label>{user ? 'Nuevo PIN (Opcional)' : 'PIN Inicial'}</Label>
                         <Input type="password" maxLength={4} placeholder="****" variant="flat" />
                         <FieldError />
                       </TextField>
 
+                      {/* Ciudad — cargada dinámicamente */}
                       <Select
-                        selectedKeys={form.city}
-                        onSelectionChange={(keys) => updateFieldSelection('city', keys)}
+                        selectedKeys={form.city_id}
+                        onSelectionChange={(keys) => updateFieldSelection('city_id', keys)}
                         className="flex-1"
                         placeholder="Ciudad"
+                        isDisabled={cities.length === 0}
                       >
                         <Label>Ciudad</Label>
                         <Select.Trigger className="bg-default-100 rounded-xl px-3 flex items-center gap-2 border-transparent hover:bg-default-200 transition-all">
@@ -249,10 +271,10 @@ export const UserModal = ({ isOpen, onClose, onSubmit, user }: UserModalProps) =
                           <Select.Indicator className="ml-auto text-muted-foreground" />
                         </Select.Trigger>
                         <Select.Popover className="min-w-[200px] bg-content1 border border-divider rounded-2xl shadow-2xl">
-                          <ListBox selectedKeys={form.city} onSelectionChange={(keys) => updateFieldSelection('city', keys)} selectionMode="single">
-                            {CITIES.map((item) => (
-                              <ListBox.Item key={item.id} id={item.id} textValue={item.label} className="rounded-xl m-1 hover:bg-primary/10 transition-colors">
-                                {item.label}
+                          <ListBox selectedKeys={form.city_id} onSelectionChange={(keys) => updateFieldSelection('city_id', keys)} selectionMode="single">
+                            {cities.map((city) => (
+                              <ListBox.Item key={String(city.id)} id={String(city.id)} textValue={city.name} className="rounded-xl m-1 hover:bg-primary/10 transition-colors">
+                                {city.name}
                                 <ListBox.ItemIndicator />
                               </ListBox.Item>
                             ))}
@@ -261,7 +283,31 @@ export const UserModal = ({ isOpen, onClose, onSubmit, user }: UserModalProps) =
                       </Select>
                     </div>
 
+                    {/* Transporte + Rol */}
                     <div className="grid grid-cols-2 gap-4">
+                      <Select
+                        selectedKeys={form.transport_type}
+                        onSelectionChange={(keys) => updateFieldSelection('transport_type', keys)}
+                        className="flex-1"
+                        placeholder="Tipo de transporte"
+                      >
+                        <Label>Transporte</Label>
+                        <Select.Trigger className="bg-default-100 rounded-xl px-3 flex items-center gap-2 border-transparent hover:bg-default-200 transition-all">
+                          <Select.Value className="text-foreground font-medium" />
+                          <Select.Indicator className="ml-auto text-muted-foreground" />
+                        </Select.Trigger>
+                        <Select.Popover className="min-w-[200px] bg-content1 border border-divider rounded-2xl shadow-2xl">
+                          <ListBox selectedKeys={form.transport_type} onSelectionChange={(keys) => updateFieldSelection('transport_type', keys)} selectionMode="single">
+                            {TRANSPORT_OPTIONS.map((item) => (
+                              <ListBox.Item key={item.id} id={item.id} textValue={item.label} className="rounded-xl m-1 hover:bg-primary/10 transition-colors">
+                                {item.label}
+                                <ListBox.ItemIndicator />
+                              </ListBox.Item>
+                            ))}
+                          </ListBox>
+                        </Select.Popover>
+                      </Select>
+
                       <Select
                         selectedKeys={form.role}
                         onSelectionChange={(keys) => updateFieldSelection('role', keys)}
@@ -284,30 +330,37 @@ export const UserModal = ({ isOpen, onClose, onSubmit, user }: UserModalProps) =
                           </ListBox>
                         </Select.Popover>
                       </Select>
-
-                      <Select
-                        selectedKeys={form.status}
-                        onSelectionChange={(keys) => updateFieldSelection('status', keys)}
-                        className="flex-1"
-                        placeholder="Seleccionar estado"
-                      >
-                        <Label>Estado</Label>
-                        <Select.Trigger className="bg-default-100 rounded-xl px-3 flex items-center gap-2 border-transparent hover:bg-default-200 transition-all">
-                          <Select.Value className="text-foreground font-medium" />
-                          <Select.Indicator className="ml-auto text-muted-foreground" />
-                        </Select.Trigger>
-                        <Select.Popover className="min-w-[200px] bg-content1 border border-divider rounded-2xl shadow-2xl">
-                          <ListBox selectedKeys={form.status} onSelectionChange={(keys) => updateFieldSelection('status', keys)} selectionMode="single">
-                            {STATUS_OPTIONS.map((item) => (
-                              <ListBox.Item key={item.id} id={item.id} textValue={item.label} className={cn("rounded-xl m-1 hover:bg-primary/10 transition-colors", item.id === 'active' ? 'text-success' : item.id === 'suspended' ? 'text-danger' : 'text-foreground')}>
-                                {item.label}
-                                <ListBox.ItemIndicator />
-                              </ListBox.Item>
-                            ))}
-                          </ListBox>
-                        </Select.Popover>
-                      </Select>
                     </div>
+
+                    {/* Estado */}
+                    <Select
+                      selectedKeys={form.status}
+                      onSelectionChange={(keys) => updateFieldSelection('status', keys)}
+                      className="w-full"
+                      placeholder="Seleccionar estado"
+                    >
+                      <Label>Estado</Label>
+                      <Select.Trigger className="bg-default-100 rounded-xl px-3 flex items-center gap-2 border-transparent hover:bg-default-200 transition-all">
+                        <Select.Value className="text-foreground font-medium" />
+                        <Select.Indicator className="ml-auto text-muted-foreground" />
+                      </Select.Trigger>
+                      <Select.Popover className="min-w-[200px] bg-content1 border border-divider rounded-2xl shadow-2xl">
+                        <ListBox selectedKeys={form.status} onSelectionChange={(keys) => updateFieldSelection('status', keys)} selectionMode="single">
+                          {STATUS_OPTIONS.map((item) => (
+                            <ListBox.Item
+                              key={item.id} id={item.id} textValue={item.label}
+                              className={cn('rounded-xl m-1 hover:bg-primary/10 transition-colors',
+                                item.id === 'active'    ? 'text-success' :
+                                item.id === 'suspended' ? 'text-danger'  : 'text-foreground'
+                              )}
+                            >
+                              {item.label}
+                              <ListBox.ItemIndicator />
+                            </ListBox.Item>
+                          ))}
+                        </ListBox>
+                      </Select.Popover>
+                    </Select>
                   </Fieldset.Group>
                 </Fieldset>
               </Modal.Body>
@@ -320,7 +373,7 @@ export const UserModal = ({ isOpen, onClose, onSubmit, user }: UserModalProps) =
                     size="lg"
                     className="w-full h-14 bg-primary text-white font-black rounded-xl text-lg shadow-lg shadow-primary/20"
                   >
-                    {isLoading ? "PROCESANDO..." : (user ? 'GUARDAR CAMBIOS' : 'REGISTRAR USUARIO')}
+                    {isLoading ? 'PROCESANDO...' : (user ? 'GUARDAR CAMBIOS' : 'REGISTRAR USUARIO')}
                   </Button>
                 </Fieldset.Actions>
               </Modal.Footer>

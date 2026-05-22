@@ -1,8 +1,8 @@
 import { Router } from 'express';
 import { ZoneController } from '../controllers/zone.controller';
-import { authMiddleware } from '../middlewares/auth';
-import { validate } from '../middlewares/validate';
-import { zoneSchema, checkRateSchema } from '../schemas/zone.schema';
+import { authMiddleware } from '../../../middlewares/auth';
+import { validate } from '../../../middlewares/validate';
+import { zoneSchema, checkRateSchema } from '../validations/zone.validation';
 
 const router = Router();
 

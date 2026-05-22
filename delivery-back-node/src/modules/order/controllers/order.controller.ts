@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import prisma from '../lib/prisma';
+import prisma from '../../../lib/prisma';
 
 export class OrderController {
   static async index(req: Request, res: Response) {

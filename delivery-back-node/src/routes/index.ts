@@ -1,9 +1,9 @@
 import { Router } from 'express';
-import authRoutes from './auth.routes';
-import userRoutes from './user.routes';
-import zoneRoutes from './zone.routes';
-import orderRoutes from './order.routes';
-import { UserController } from '../controllers/user.controller';
+import { authRoutes } from '../modules/auth';
+import { userRoutes, UserController } from '../modules/user';
+import { zoneRoutes } from '../modules/zone';
+import { orderRoutes } from '../modules/order';
+import { complianceRoutes } from '../modules/compliance';
 
 const router = Router();
 
@@ -11,6 +11,7 @@ router.use('/auth', authRoutes);
 router.use('/users', userRoutes);
 router.use('/zones', zoneRoutes);
 router.use('/orders', orderRoutes);
+router.use('/compliance', complianceRoutes);
 router.get('/drivers-active', UserController.getDriversActive);
 
 export default router;

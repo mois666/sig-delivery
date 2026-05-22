@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import prisma from '../lib/prisma';
+import prisma from '../../../lib/prisma';
 import { GeoService } from '../services/geo.service';
 import axios from 'axios';
 

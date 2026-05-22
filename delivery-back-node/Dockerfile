@@ -10,9 +10,9 @@ COPY tsconfig.json ./
 COPY prisma ./prisma
 COPY src ./src
 
-# Compilar TypeScript + generar Prisma client
-RUN npm run build
+# Generar Prisma client y luego compilar TypeScript
 RUN npx prisma generate
+RUN npm run build
 
 # --- Imagen final (sin devDependencies ni fuentes .ts) ---
 FROM node:20-alpine

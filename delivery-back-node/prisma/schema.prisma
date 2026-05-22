@@ -11,6 +11,7 @@ datasource db {
 }
 
 enum Role {
+  super_admin
   admin
   driver
 }
@@ -40,6 +41,15 @@ model User {
   
   wallet            Wallet?
   assignments       OrderAssignment[]
+
+  // Auditoría obligatoria para Play Store / Compliance
+  isActive          Boolean           @default(true)
+  deletedAt         DateTime?         // Soporte para Soft Delete solicitado por Google
+
+  // Relaciones de Cumplimiento Normativo
+  consents          UserConsent[]
+  deviceTokens      DeviceToken[]
+  accountDeletions  AccountDeletionRequest[]
 
   @@map("users")
 }
@@ -124,4 +134,78 @@ model Zone {
   updated_at  DateTime @updatedAt
 
   @@map("zones")
+}
+
+enum DeletionReason {
+  PRIVACY_CONCERNS
+  APP_NOT_USEFUL
+  TOO_MANY_NOTIFICATIONS
+  TEMPORARY_ACC_CREATION
+  OTHER
+}
+
+// 1. TABLA: Consentimientos explícitos del Usuario (Requerido para Background Location)
+model UserConsent {
+  id              String         @id @default(uuid())
+  userId          Int
+  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  consentType     String         // e.g., "BACKGROUND_LOCATION", "PRIVACY_POLICY", "MARKETING"
+  isGranted       Boolean        @default(false)
+  policyVersion   String         // Versión del documento que aceptó (e.g., "v1.2.0")
+  ipAddress       String?        // Prueba de origen del consentimiento
+  grantedAt       DateTime       @default(now())
+  revokedAt       DateTime?
+
+  @@unique([userId, consentType, policyVersion])
+  @@index([consentType])
+  @@map("user_consents")
+}
+
+// 2. TABLA: Registro de dispositivos y Tokens de Notificación (Transparencia en Seguridad de Datos)
+model DeviceToken {
+  id            String    @id @default(uuid())
+  userId        Int
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token         String    @unique // FCM Token (Firebase Cloud Messaging) o similar
+  deviceOs      String    // "ANDROID" o "IOS"
+  osVersion     String?   // e.g., "Android 14"
+  deviceModel   String?   // e.g., "Samsung S24"
+  isActive      Boolean   @default(true)
+  lastUsedAt    DateTime  @default(now())
+  createdAt     DateTime  @default(now())
+
+  @@index([userId])
+  @@index([token])
+  @@map("device_tokens")
+}
+
+// 3. TABLA: Solicitudes de Eliminación de Cuenta (Google Data Deletion Policy Compliance)
+model AccountDeletionRequest {
+  id            String          @id @default(uuid())
+  userId        Int
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reason        DeletionReason
+  customReason  String?         @db.Text
+  status        String          @default("PENDING") // PENDING, PROCESSED, CANCELLED
+  scheduledFor  DateTime        // Google permite un periodo de gracia (e.g., 15 días antes del hard delete)
+  createdAt     DateTime        @default(now())
+  processedAt   DateTime?
+
+  @@index([userId])
+  @@index([status])
+  @@map("account_deletion_requests")
+}
+
+// 4. TABLA: Control de Versiones de Políticas Legales (Transparencia de Cara al Usuario)
+model AppPolicy {
+  id          String   @id @default(uuid())
+  title       String   // e.g., "Términos y Condiciones", "Política de Privacidad"
+  type        String   // "TERMS", "PRIVACY", "LOCATION_DISCLOSURE"
+  version     String   // e.g., "v1.0.0"
+  content     String   @db.Text
+  isActive    Boolean  @default(false)
+  publishedAt DateTime @default(now())
+
+  @@unique([type, version])
+  @@map("app_policies")
 }

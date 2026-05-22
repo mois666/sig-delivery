@@ -4,20 +4,23 @@ import { useAuthStore } from "@/stores/authStore";
 import {
   LayoutDashboard, Package, Map, ClipboardList,
   Home, Rocket, Wallet, Trophy, LogOut,
-  Settings, ChevronRight
+  Settings, ChevronRight, Users
 } from "lucide-react";
 import { motion } from "framer-motion";
 
 export const Sidebar = () => {
   const location = useLocation();
   const { user, logout } = useAuthStore();
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
 
   const menuItems = isAdmin ? [
     { name: "Dashboard", path: "/admin", icon: LayoutDashboard },
-    { name: "Entregas", path: "/delivery", icon: Package },
+    { name: "Usuarios", path: "/users", icon: Users },
     { name: "Zonas", path: "/zone", icon: Map },
     { name: "Pedidos", path: "/orders", icon: ClipboardList },
+    { name: "Billetera", path: "/wallet", icon: Wallet },
+    { name: "Ranking", path: "/ranking", icon: Trophy },
+
   ] : [
     { name: "Inicio", path: "/home", icon: Home },
     { name: "Entrega Activa", path: "/active-delivery", icon: Rocket },

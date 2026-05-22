@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import prisma from '../../../lib/prisma';
 import jwt from 'jsonwebtoken';
+import bcrypt from 'bcryptjs';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_key_123_change_this_later';
 const ACCESS_TOKEN_EXPIRY = '15m';
@@ -15,7 +16,15 @@ export class AuthController {
         where: { phone },
       });
 
-      if (!user || user.pin !== pin) {
+      if (!user) {
+        return res.status(401).json({ message: 'Credenciales inválidas' });
+      }
+
+      const isPinMatch = user.pin.startsWith('$2')
+        ? await bcrypt.compare(pin, user.pin)
+        : user.pin === pin;
+
+      if (!isPinMatch) {
         return res.status(401).json({ message: 'Credenciales inválidas' });
       }
 

@@ -56,11 +56,15 @@ const Profile = () => {
             </h1>
             <p className="text-sm text-muted-foreground">{user?.phone}</p>
             <span className={`inline-block mt-2 px-3 py-1 rounded-full text-xs font-medium ${
-              user?.role === 'admin' 
+              user?.role === 'admin' || user?.role === 'super_admin'
                 ? 'bg-accent/20 text-accent' 
-                : 'bg-primary/20 text-primary'
+                : user?.role === 'client'
+                  ? 'bg-success/20 text-success'
+                  : 'bg-primary/20 text-primary'
             }`}>
-              {user?.role === 'admin' ? 'Administrador' : 'Repartidor'}
+              {user?.role === 'super_admin' ? 'Super Admin' :
+               user?.role === 'admin' ? 'Administrador' :
+               user?.role === 'client' ? 'Cliente' : 'Repartidor'}
             </span>
           </motion.div>
         </div>

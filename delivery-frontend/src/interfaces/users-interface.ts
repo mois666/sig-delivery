@@ -1,9 +1,10 @@
-export type UserRole = 'admin' | 'driver';
+export type UserRole = 'super_admin' | 'admin' | 'driver' | 'client';
 export type UserStatus = 'active' | 'inactive' | 'suspended';
 
 export interface IUser {
   id: number;
   name: string;
+  email: string;
   phone: string;
   pin?: string;
   city: string;

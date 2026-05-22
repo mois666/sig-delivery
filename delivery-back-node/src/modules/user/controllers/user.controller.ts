@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import prisma from '../../../lib/prisma';
+import bcrypt from 'bcryptjs';
 
 export class UserController {
   static async index(req: Request, res: Response) {
@@ -15,11 +16,12 @@ export class UserController {
     const { name, phone, pin, email, city, role, status } = req.body;
 
     try {
+      const hashedPin = await bcrypt.hash(pin, 10);
       const user = await prisma.user.create({
         data: {
           name,
           phone,
-          pin,
+          pin: hashedPin,
           email,
           city,
           role,
@@ -73,6 +75,8 @@ export class UserController {
     // Si el pin está vacío o no se proporciona, no lo actualizamos
     if (!data.pin) {
       delete data.pin;
+    } else {
+      data.pin = await bcrypt.hash(data.pin, 10);
     }
 
     try {

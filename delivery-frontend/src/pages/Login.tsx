@@ -23,6 +23,20 @@ const countryCodes = [
   { label: '🇨🇱 +56', id: '+56' },
 ];
 
+const getValueFromSet = (value: any): string => {
+  if (!value) return '';
+  if (value instanceof Set) {
+    const arr = Array.from(value);
+    return arr[0] ? String(arr[0]) : '';
+  }
+  if (typeof value === 'string') return value;
+  if (typeof value === 'object' && typeof value[Symbol.iterator] === 'function') {
+    const arr = Array.from(value);
+    return arr.length > 0 ? String(arr[0]) : '';
+  }
+  return String(value);
+};
+
 export const Login = () => {
   const navigate = useNavigate();
   const { login, isLoading, error, clearError, isAuthenticated } = useAuthStore();
@@ -76,9 +90,11 @@ export const Login = () => {
     const isPinValid = pin.every((digit) => digit !== '');
     if (!isPinValid) return;
 
-    const fullPhone = `${Array.from(countryCode)[0]}${extractedPhone}`;
+    const countryCodeValue = getValueFromSet(countryCode);
+    const cityValue = getValueFromSet(city);
+    const fullPhone = `${countryCodeValue}${extractedPhone}`;
     const pinCode = pin.join('');
-    await login({ city: Array.from(city)[0] as string, phone: fullPhone, pin: pinCode });
+    await login({ city: cityValue, phone: fullPhone, pin: pinCode });
   };
 
   return (
@@ -113,7 +129,10 @@ export const Login = () => {
                   <div className="w-full">
                     <Select
                       selectedKeys={city}
-                      onSelectionChange={(keys) => setCity(keys as Set<string>)}
+                      onSelectionChange={(keys) => {
+                        const val = getValueFromSet(keys);
+                        setCity(new Set([val]));
+                      }}
                       className="w-full"
                       label="Ciudad de Operación"
                       labelPlacement="outside"
@@ -124,7 +143,7 @@ export const Login = () => {
                         <Select.Indicator className="ml-auto text-muted-foreground" />
                       </Select.Trigger>
                       <Select.Popover className="min-w-[240px] bg-content1 border border-divider rounded-2xl shadow-2xl">
-                        <ListBox selectedKeys={city} onSelectionChange={(keys) => setCity(keys as Set<string>)} selectionMode="single">
+                        <ListBox selectedKeys={city} onSelectionChange={(keys) => { const val = getValueFromSet(keys); setCity(new Set([val])); }} selectionMode="single">
                           {cities.map((item) => (
                             <ListBox.Item key={item.id} id={item.id} textValue={item.label} className="rounded-xl m-1 hover:bg-primary/10 transition-colors">
                               {item.label}
@@ -140,7 +159,10 @@ export const Login = () => {
                   <div className="flex gap-3">
                     <Select
                       selectedKeys={countryCode}
-                      onSelectionChange={(keys) => setCountryCode(keys as Set<string>)}
+                      onSelectionChange={(keys) => {
+                        const val = getValueFromSet(keys);
+                        setCountryCode(new Set([val]));
+                      }}
                       className="w-36"
                       label="País"
                       labelPlacement="outside"
@@ -150,7 +172,7 @@ export const Login = () => {
                         <Select.Indicator className="ml-auto text-muted-foreground" />
                       </Select.Trigger>
                       <Select.Popover className="bg-content1 border border-divider rounded-2xl shadow-2xl">
-                        <ListBox selectedKeys={countryCode} onSelectionChange={(keys) => setCountryCode(keys as Set<string>)} selectionMode="single">
+                        <ListBox selectedKeys={countryCode} onSelectionChange={(keys) => { const val = getValueFromSet(keys); setCountryCode(new Set([val])); }} selectionMode="single">
                           {countryCodes.map((item) => (
                             <ListBox.Item key={item.id} id={item.id} textValue={item.label} className="rounded-xl m-1 hover:bg-primary/10 transition-colors">
                               {item.label}

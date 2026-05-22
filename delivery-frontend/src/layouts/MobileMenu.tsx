@@ -1,16 +1,16 @@
 import { Link, useLocation } from "react-router-dom";
 import { useAuthStore } from "@/stores/authStore";
-import { LayoutDashboard, Package, Map, ClipboardList, Home, Rocket, Wallet, Trophy } from "lucide-react";
+import { LayoutDashboard, Package, Map, ClipboardList, Home, Rocket, Wallet, Trophy, Users } from "lucide-react";
 import { motion } from "framer-motion";
 
 export const MobileMenu = () => {
   const location = useLocation();
   const { user } = useAuthStore();
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
 
   const menuItems = isAdmin ? [
     { name: "Panel", path: "/admin", icon: LayoutDashboard },
-    { name: "Entregas", path: "/delivery", icon: Package },
+    { name: "Usuarios", path: "/users", icon: Users },
     { name: "Zonas", path: "/zone", icon: Map },
     { name: "Pedidos", path: "/orders", icon: ClipboardList },
   ] : [
@@ -38,12 +38,10 @@ export const MobileMenu = () => {
                 transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
               />
             )}
-            <Icon className={`w-5 h-5 mb-1 transition-all duration-300 ${
-              isActive ? "text-primary scale-110" : "text-white/40 group-hover:text-white"
-            }`} />
-            <span className={`text-[9px] font-black uppercase tracking-tighter transition-all duration-300 ${
-              isActive ? "text-primary" : "text-white/30 group-hover:text-white/60"
-            }`}>
+            <Icon className={`w-5 h-5 mb-1 transition-all duration-300 ${isActive ? "text-primary scale-110" : "text-white/40 group-hover:text-white"
+              }`} />
+            <span className={`text-[9px] font-black uppercase tracking-tighter transition-all duration-300 ${isActive ? "text-primary" : "text-white/30 group-hover:text-white/60"
+              }`}>
               {item.name}
             </span>
           </Link>

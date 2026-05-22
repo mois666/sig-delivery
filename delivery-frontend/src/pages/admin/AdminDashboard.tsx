@@ -10,12 +10,12 @@ import { ChallengeModal } from '@/components/modals/ChallengeModal';
 import { orderTypeConfig } from '@/interfaces/orders-interface';
 import { calculateDistance, getAddressFromCoords } from '@/lib/geoUtils';
 import { toast } from 'sonner';
-import { useDeliveryStore } from '@/stores/deliveryStore';
+import { useUserStore } from '@/stores/userStore';
 
 const AdminDashboard = () => {
   const { orders, removeOrder, fetchOrders, isLoading } = useOrderStore();
   const { rankings } = useRankingStore();
-  const { activeDrivers: fetchActiveDrivers } = useDeliveryStore();
+  const { activeDrivers: fetchActiveDrivers } = useUserStore();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [activeDrivers, setActiveDrivers] = useState(0);
 

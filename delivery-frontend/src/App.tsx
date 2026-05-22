@@ -11,18 +11,18 @@ import Wallet from "./pages/Wallet";
 import Profile from "./pages/Profile";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import NotFound from "./pages/NotFound";
-import AdminDelivery from "./pages/admin/AdminDelivery";
 import { AuthProvider } from "./layouts/AuthProvider";
-import { AdminShowDelivery } from "./pages/admin/AdminShowDelivery";
 import AdminZone from "./pages/admin/AdminZone";
 import { AdminOrders } from "./pages/admin/AdminOrders";
 import { useSocketStore } from "./stores/socketStore";
 import { useEffect } from "react";
+import AdminUsers from "./pages/admin/AdminUsers";
+import { AdminShowUser } from "./pages/admin/AdminShowUser";
 
 const queryClient = new QueryClient();
 
 // Protected route component
-const ProtectedRoute = ({ children, allowedRoles }: { children: React.ReactNode; allowedRoles?: ('admin' | 'driver')[] }) => {
+const ProtectedRoute = ({ children, allowedRoles }: { children: React.ReactNode; allowedRoles?: ('super_admin' | 'admin' | 'driver' | 'client')[] }) => {
   const { isAuthenticated, user } = useAuthStore();
 
   if (!isAuthenticated) {
@@ -61,29 +61,29 @@ const AppRoutes = () => (
 
       {/* Admin routes */}
       <Route path="/admin" element={
-        <ProtectedRoute allowedRoles={['admin']}>
+        <ProtectedRoute allowedRoles={['admin', 'super_admin']}>
           <AdminDashboard />
         </ProtectedRoute>
       } />
 
-      <Route path="/delivery" element={
-        <ProtectedRoute allowedRoles={['admin']}>
-          <AdminDelivery />
+      <Route path="/users" element={
+        <ProtectedRoute allowedRoles={['admin', 'super_admin']}>
+          <AdminUsers />
         </ProtectedRoute>
       } />
-      <Route path="/delivery/:id" element={
-        <ProtectedRoute allowedRoles={['admin']}>
-          <AdminShowDelivery />
+      <Route path="/users/:id" element={
+        <ProtectedRoute allowedRoles={['admin', 'super_admin']}>
+          <AdminShowUser />
         </ProtectedRoute>
       } />
       {/* Zonas */}
       <Route path="/zone" element={
-        <ProtectedRoute allowedRoles={['admin']}>
+        <ProtectedRoute allowedRoles={['admin', 'super_admin']}>
           <AdminZone />
         </ProtectedRoute>
       } />
       <Route path="/orders" element={
-        <ProtectedRoute allowedRoles={['admin']}>
+        <ProtectedRoute allowedRoles={['admin', 'super_admin']}>
           <AdminOrders />
         </ProtectedRoute>
       } />

@@ -4,16 +4,16 @@ import bcrypt from 'bcryptjs';
 const prisma = new PrismaClient();
 
 const CITIES = [
-  { name: 'Oruro',       country: 'Bolivia', currency: 'BOB', coordinates: Prisma.JsonNull },
-  { name: 'La Paz',      country: 'Bolivia', currency: 'BOB', coordinates: Prisma.JsonNull },
-  { name: 'Cochabamba',  country: 'Bolivia', currency: 'BOB', coordinates: Prisma.JsonNull },
-  { name: 'Santa Cruz',  country: 'Bolivia', currency: 'BOB', coordinates: Prisma.JsonNull },
-  { name: 'Potosí',      country: 'Bolivia', currency: 'BOB', coordinates: Prisma.JsonNull },
-  { name: 'Sucre',       country: 'Bolivia', currency: 'BOB', coordinates: Prisma.JsonNull },
-  { name: 'Tarija',      country: 'Bolivia', currency: 'BOB', coordinates: Prisma.JsonNull },
-  { name: 'Trinidad',    country: 'Bolivia', currency: 'BOB', coordinates: Prisma.JsonNull },
-  { name: 'Beni',        country: 'Bolivia', currency: 'BOB', coordinates: Prisma.JsonNull },
-  { name: 'Cobija',      country: 'Bolivia', currency: 'BOB', coordinates: Prisma.JsonNull },
+  { name: 'Oruro',       country: 'Bolivia', currency: 'BOB', timezone: 'America/La_Paz', center_lat: -17.9647, center_lng: -67.1060 },
+  { name: 'La Paz',      country: 'Bolivia', currency: 'BOB', timezone: 'America/La_Paz', center_lat: -16.4897, center_lng: -68.1193 },
+  { name: 'Cochabamba',  country: 'Bolivia', currency: 'BOB', timezone: 'America/La_Paz', center_lat: -17.3895, center_lng: -66.1568 },
+  { name: 'Santa Cruz',  country: 'Bolivia', currency: 'BOB', timezone: 'America/La_Paz', center_lat: -17.7834, center_lng: -63.1821 },
+  { name: 'Potosí',      country: 'Bolivia', currency: 'BOB', timezone: 'America/La_Paz', center_lat: -19.5723, center_lng: -65.7550 },
+  { name: 'Sucre',       country: 'Bolivia', currency: 'BOB', timezone: 'America/La_Paz', center_lat: -19.0196, center_lng: -65.2619 },
+  { name: 'Tarija',      country: 'Bolivia', currency: 'BOB', timezone: 'America/La_Paz', center_lat: -21.5353, center_lng: -64.7296 },
+  { name: 'Trinidad',    country: 'Bolivia', currency: 'BOB', timezone: 'America/La_Paz', center_lat: -14.8348, center_lng: -64.9043 },
+  { name: 'Beni',        country: 'Bolivia', currency: 'BOB', timezone: 'America/La_Paz', center_lat: -14.2785, center_lng: -65.2783 },
+  { name: 'Cobija',      country: 'Bolivia', currency: 'BOB', timezone: 'America/La_Paz', center_lat: -11.0298, center_lng: -68.7695 },
 ];
 
 async function main() {
@@ -46,7 +46,6 @@ async function main() {
       email:          'carlos@drivecore.com',
       phone:          '+59167239563',
       pin:            driverPin,
-      city_id:        oruro.id,
       transport_type: 'motorcycle',
       role:           'driver',
       points:         0,
@@ -62,7 +61,6 @@ async function main() {
       email:          'juan@drivecore.com',
       phone:          '+59160427039',
       pin:            adminPin,
-      city_id:        oruro.id,
       transport_type: 'motorcycle',
       role:           'admin',
       points:         0,

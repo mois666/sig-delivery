@@ -10,7 +10,7 @@ export interface IUser {
   email:          string;
   phone:          string;
   pin?:           string;
-  city_id:        number;
+  city_id?:       number;
   city?:          ICity;
   transport_type?: TransportType;
   role:           UserRole;

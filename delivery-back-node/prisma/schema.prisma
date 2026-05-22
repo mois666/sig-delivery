@@ -53,12 +53,14 @@ model City {
   name        String   @unique
   country     String   @default("Bolivia")
   currency    String   @default("BOB") @db.VarChar(3)
-  coordinates Json?    // Área/polígono de la ciudad: [[lat, lng], ...]
+  timezone    String   @default("America/La_Paz")
   is_active   Boolean  @default(true)
+  center_lat  Float    @default(-17.9647)
+  center_lng  Float    @default(-67.1060)
+  coordinates Unsupported("geometry(Geometry, 4326)")?
   created_at  DateTime @default(now())
   updated_at  DateTime @updatedAt
 
-  users  User[]
   orders Order[]
 
   @@map("cities")
@@ -72,8 +74,6 @@ model User {
   email             String?        @unique
   phone             String         @unique
   pin               String
-  city_id           Int            @default(1)
-  city              City           @relation(fields: [city_id], references: [id])
   transport_type    TransportType  @default(motorcycle)
   role              Role           @default(driver)
   status            UserStatus     @default(active)
@@ -148,6 +148,8 @@ model Wallet {
   id         Int           @id @default(autoincrement())
   user_id    Int           @unique
   balance    Decimal       @default(0.00) @db.Decimal(15, 2)
+  currency   String        @default("BOB") @db.VarChar(3)
+  is_active  Boolean       @default(true)
   created_at DateTime      @default(now())
   updated_at DateTime      @updatedAt
 
@@ -163,6 +165,7 @@ model Transaction {
   type       String   @db.VarChar(30) // deposit, withdrawal, payment, refund
   amount     Decimal  @db.Decimal(15, 2)
   reference  String?
+  metadata   Json     @default("{}")
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 

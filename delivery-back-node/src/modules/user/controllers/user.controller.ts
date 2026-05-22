@@ -3,7 +3,6 @@ import prisma from '../../../lib/prisma';
 import bcrypt from 'bcryptjs';
 
 const USER_INCLUDE = {
-  city:   { select: { id: true, name: true, country: true, currency: true } },
   wallet: true,
 } as const;
 
@@ -11,7 +10,7 @@ export class UserController {
   static async index(req: Request, res: Response) {
     try {
       const users = await prisma.user.findMany({
-        include: { city: { select: { id: true, name: true, country: true, currency: true } } },
+        include: { wallet: true },
         orderBy: { created_at: 'desc' },
       });
       return res.json(users);
@@ -21,7 +20,7 @@ export class UserController {
   }
 
   static async store(req: Request, res: Response) {
-    const { name, phone, pin, email, city_id, transport_type, role, status } = req.body;
+    const { name, phone, pin, email, transport_type, role, status } = req.body;
 
     try {
       const hashedPin = await bcrypt.hash(pin, 10);
@@ -31,7 +30,6 @@ export class UserController {
           phone,
           pin: hashedPin,
           email,
-          city_id:        city_id   ? Number(city_id)   : 1,
           transport_type: transport_type || 'motorcycle',
           role,
           status,
@@ -66,8 +64,8 @@ export class UserController {
     const id   = parseInt(req.params.id as string);
     const data = { ...req.body };
 
-    // Convertir city_id a número si viene como string
-    if (data.city_id !== undefined) data.city_id = Number(data.city_id);
+    // Eliminar city_id si viene por error en el body
+    delete data.city_id;
 
     // Hashear PIN si se proporciona
     if (!data.pin) {

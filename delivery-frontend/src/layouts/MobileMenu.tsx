@@ -1,6 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
 import { useAuthStore } from "@/stores/authStore";
-import { LayoutDashboard, Package, Map, ClipboardList, Home, Rocket, Wallet, Trophy, Users } from "lucide-react";
+import { LayoutDashboard, Package, Map, ClipboardList, Home, Rocket, Wallet, Trophy, Users, Globe } from "lucide-react";
 import { motion } from "framer-motion";
 
 export const MobileMenu = () => {
@@ -11,6 +11,7 @@ export const MobileMenu = () => {
   const menuItems = isAdmin ? [
     { name: "Panel", path: "/admin", icon: LayoutDashboard },
     { name: "Usuarios", path: "/users", icon: Users },
+    { name: "Ciudades", path: "/cities", icon: Globe },
     { name: "Zonas", path: "/zone", icon: Map },
     { name: "Pedidos", path: "/orders", icon: ClipboardList },
   ] : [

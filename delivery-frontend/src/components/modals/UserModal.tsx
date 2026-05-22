@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { UserPlus, Edit3 } from 'lucide-react';
 import { Button, Modal, Input, Select, Label, ListBox, Form, Fieldset, TextField, FieldError } from '@heroui/react';
 import { IUser } from '@/interfaces/users-interface';
-import { useCityStore } from '@/stores/cityStore';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -60,42 +59,32 @@ const getValueFromSelection = (value: any): string => {
 
 export const UserModal = ({ isOpen, onClose, onSubmit, user }: UserModalProps) => {
   const [isLoading, setIsLoading] = useState(false);
-  const { cities, fetchCities }   = useCityStore();
 
   const [form, setForm] = useState({
     countryCode:    new Set(['+591']),
-    city_id:        new Set(['1']),
     status:         new Set(['active'])     as any,
     role:           new Set(['driver'])     as any,
     transport_type: new Set(['motorcycle']) as any,
   });
-
-  // Cargar ciudades si no están cargadas
-  useEffect(() => {
-    if (cities.length === 0) fetchCities();
-  }, []);
 
   // Cuando se abre el modal o cambia el usuario, sincronizar form
   useEffect(() => {
     if (user) {
       setForm({
         countryCode:    new Set(['+591']),
-        city_id:        new Set([String(user.city_id || 1)]),
         status:         new Set([user.status]),
         role:           new Set([user.role || 'driver']),
         transport_type: new Set([user.transport_type || 'motorcycle']),
       });
     } else {
-      const firstCityId = cities.length > 0 ? String(cities[0].id) : '1';
       setForm({
         countryCode:    new Set(['+591']),
-        city_id:        new Set([firstCityId]),
         status:         new Set(['active']),
         role:           new Set(['driver']),
         transport_type: new Set(['motorcycle']),
       });
     }
-  }, [user, isOpen, cities]);
+  }, [user, isOpen]);
 
   /** Actualiza un campo del form garantizando un Set<string> limpio */
   const updateFieldSelection = (field: string, keys: any) => {
@@ -138,7 +127,6 @@ export const UserModal = ({ isOpen, onClose, onSubmit, user }: UserModalProps) =
       email:          data.email,
       pin:            data.pin || undefined,
       role:           getValueFromSelection(form.role),
-      city_id:        parseInt(getValueFromSelection(form.city_id)),
       transport_type: getValueFromSelection(form.transport_type),
       status:         getValueFromSelection(form.status),
       phone:          `${getValueFromSelection(form.countryCode)}${data.phone}`,
@@ -242,46 +230,19 @@ export const UserModal = ({ isOpen, onClose, onSubmit, user }: UserModalProps) =
                       </TextField>
                     </div>
 
-                    {/* PIN + Ciudad */}
-                    <div className="grid grid-cols-2 gap-4">
-                      <TextField
-                        isRequired={!user}
-                        name="pin"
-                        validate={(value) => {
-                          if (!user && value.length !== 4) return 'PIN de 4 dígitos';
-                          return null;
-                        }}
-                      >
-                        <Label>{user ? 'Nuevo PIN (Opcional)' : 'PIN Inicial'}</Label>
-                        <Input type="password" maxLength={4} placeholder="****" variant="flat" />
-                        <FieldError />
-                      </TextField>
-
-                      {/* Ciudad — cargada dinámicamente */}
-                      <Select
-                        selectedKeys={form.city_id}
-                        onSelectionChange={(keys) => updateFieldSelection('city_id', keys)}
-                        className="flex-1"
-                        placeholder="Ciudad"
-                        isDisabled={cities.length === 0}
-                      >
-                        <Label>Ciudad</Label>
-                        <Select.Trigger className="bg-default-100 rounded-xl px-3 flex items-center gap-2 border-transparent hover:bg-default-200 transition-all">
-                          <Select.Value className="text-foreground font-medium" />
-                          <Select.Indicator className="ml-auto text-muted-foreground" />
-                        </Select.Trigger>
-                        <Select.Popover className="min-w-[200px] bg-content1 border border-divider rounded-2xl shadow-2xl">
-                          <ListBox selectedKeys={form.city_id} onSelectionChange={(keys) => updateFieldSelection('city_id', keys)} selectionMode="single">
-                            {cities.map((city) => (
-                              <ListBox.Item key={String(city.id)} id={String(city.id)} textValue={city.name} className="rounded-xl m-1 hover:bg-primary/10 transition-colors">
-                                {city.name}
-                                <ListBox.ItemIndicator />
-                              </ListBox.Item>
-                            ))}
-                          </ListBox>
-                        </Select.Popover>
-                      </Select>
-                    </div>
+                    {/* PIN */}
+                    <TextField
+                      isRequired={!user}
+                      name="pin"
+                      validate={(value) => {
+                        if (!user && value.length !== 4) return 'PIN de 4 dígitos';
+                        return null;
+                      }}
+                    >
+                      <Label>{user ? 'Nuevo PIN (Opcional)' : 'PIN Inicial'}</Label>
+                      <Input type="password" maxLength={4} placeholder="****" variant="flat" />
+                      <FieldError />
+                    </TextField>
 
                     {/* Transporte + Rol */}
                     <div className="grid grid-cols-2 gap-4">

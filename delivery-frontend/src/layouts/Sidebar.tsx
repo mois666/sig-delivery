@@ -4,7 +4,7 @@ import { useAuthStore } from "@/stores/authStore";
 import {
   LayoutDashboard, Package, Map, ClipboardList,
   Home, Rocket, Wallet, Trophy, LogOut,
-  Settings, ChevronRight, Users
+  Settings, ChevronRight, Users, Globe
 } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -16,6 +16,7 @@ export const Sidebar = () => {
   const menuItems = isAdmin ? [
     { name: "Dashboard", path: "/admin", icon: LayoutDashboard },
     { name: "Usuarios", path: "/users", icon: Users },
+    { name: "Ciudades", path: "/cities", icon: Globe },
     { name: "Zonas", path: "/zone", icon: Map },
     { name: "Pedidos", path: "/orders", icon: ClipboardList },
     { name: "Billetera", path: "/wallet", icon: Wallet },

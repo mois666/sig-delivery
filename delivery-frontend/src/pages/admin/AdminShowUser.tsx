@@ -52,7 +52,7 @@ export const AdminShowUser = () => {
         <div className="min-h-screen bg-background pb-24 safe-top">
             {/* Header con botón atrás */}
             <div className="glass-card mx-4 mt-4 p-4 flex items-center gap-4">
-                <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="rounded-xl">
+                <Button variant="ghost" size="md" onClick={() => navigate(-1)} className="rounded-xl">
                     <ArrowLeft className="w-5 h-5" />
                 </Button>
                 <h1 className="font-display font-bold text-lg">Perfil del Usuario</h1>
@@ -75,7 +75,7 @@ export const AdminShowUser = () => {
                         )}>
                             {user.status}
                         </span>
-                        <span className="text-muted-foreground text-sm">• {user.city}</span>
+                        {user.city?.name && <span className="text-muted-foreground text-sm">• {user.city.name}</span>}
                     </div>
 
                     <div className="grid grid-cols-2 gap-4 w-full mt-6 border-t border-border/50 pt-6">

@@ -9,14 +9,11 @@ const REFRESH_TOKEN_EXPIRY = '7d';
 
 export class AuthController {
   static async login(req: Request, res: Response) {
-    const { phone, pin } = req.body;
+    const { phone, pin, city_id } = req.body;
 
     try {
       const user = await prisma.user.findUnique({
         where: { phone },
-        include: {
-          city: { select: { id: true, name: true, country: true, currency: true } },
-        },
       });
 
       if (!user) {
@@ -31,14 +28,20 @@ export class AuthController {
         return res.status(401).json({ message: 'Credenciales inválidas' });
       }
 
+      const resolvedCityId = city_id ? Number(city_id) : 1;
+      const city = await prisma.city.findUnique({
+        where: { id: resolvedCityId },
+        select: { id: true, name: true, country: true, currency: true },
+      });
+
       const accessToken = jwt.sign(
-        { id: user.id, phone: user.phone, role: user.role, city_id: user.city_id },
+        { id: user.id, phone: user.phone, role: user.role, city_id: resolvedCityId },
         JWT_SECRET,
         { expiresIn: ACCESS_TOKEN_EXPIRY }
       );
 
       const refreshToken = jwt.sign(
-        { id: user.id },
+        { id: user.id, city_id: resolvedCityId },
         JWT_SECRET,
         { expiresIn: REFRESH_TOKEN_EXPIRY }
       );
@@ -50,8 +53,11 @@ export class AuthController {
         maxAge: 7 * 24 * 60 * 60 * 1000,
       });
 
-      return res.json({ user, accessToken });
+      const userWithCity = { ...user, city };
+
+      return res.json({ user: userWithCity, accessToken });
     } catch (error) {
+      console.error('Login error:', error);
       return res.status(500).json({ message: 'Error en el servidor' });
     }
   }
@@ -67,20 +73,27 @@ export class AuthController {
       const decoded = jwt.verify(refreshToken, JWT_SECRET) as any;
       const user = await prisma.user.findUnique({
         where: { id: decoded.id },
-        include: { city: { select: { id: true, name: true, country: true, currency: true } } },
       });
 
       if (!user) {
         return res.status(401).json({ message: 'Usuario no encontrado' });
       }
 
+      const resolvedCityId = decoded.city_id ? Number(decoded.city_id) : 1;
+      const city = await prisma.city.findUnique({
+        where: { id: resolvedCityId },
+        select: { id: true, name: true, country: true, currency: true },
+      });
+
       const newAccessToken = jwt.sign(
-        { id: user.id, phone: user.phone, role: user.role, city_id: user.city_id },
+        { id: user.id, phone: user.phone, role: user.role, city_id: resolvedCityId },
         JWT_SECRET,
         { expiresIn: ACCESS_TOKEN_EXPIRY }
       );
 
-      return res.json({ user, accessToken: newAccessToken });
+      const userWithCity = { ...user, city };
+
+      return res.json({ user: userWithCity, accessToken: newAccessToken });
     } catch (error) {
       return res.status(401).json({ message: 'Token de refresco inválido' });
     }

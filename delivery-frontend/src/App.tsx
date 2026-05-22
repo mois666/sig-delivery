@@ -13,6 +13,7 @@ import AdminDashboard from "./pages/admin/AdminDashboard";
 import NotFound from "./pages/NotFound";
 import { AuthProvider } from "./layouts/AuthProvider";
 import AdminZone from "./pages/admin/AdminZone";
+import { AdminCities } from "./pages/admin/AdminCities";
 import { AdminOrders } from "./pages/admin/AdminOrders";
 import { useSocketStore } from "./stores/socketStore";
 import { useEffect } from "react";
@@ -80,6 +81,12 @@ const AppRoutes = () => (
       <Route path="/zone" element={
         <ProtectedRoute allowedRoles={['admin', 'super_admin']}>
           <AdminZone />
+        </ProtectedRoute>
+      } />
+      {/* Ciudades */}
+      <Route path="/cities" element={
+        <ProtectedRoute allowedRoles={['admin', 'super_admin']}>
+          <AdminCities />
         </ProtectedRoute>
       } />
       <Route path="/orders" element={

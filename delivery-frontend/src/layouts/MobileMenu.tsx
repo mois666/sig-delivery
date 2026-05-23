@@ -12,7 +12,6 @@ export const MobileMenu = () => {
     { name: "Panel", path: "/admin", icon: LayoutDashboard },
     { name: "Usuarios", path: "/users", icon: Users },
     { name: "Ciudades", path: "/cities", icon: Globe },
-    { name: "Zonas", path: "/zone", icon: Map },
     { name: "Pedidos", path: "/orders", icon: ClipboardList },
   ] : [
     { name: "Inicio", path: "/home", icon: Home },

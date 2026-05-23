@@ -79,7 +79,7 @@ const AppRoutes = () => (
         </ProtectedRoute>
       } />
       {/* Zonas */}
-      <Route path="/zone" element={
+      <Route path="/cities/zones" element={
         <ProtectedRoute allowedRoles={['admin', 'super_admin']}>
           <AdminZone />
         </ProtectedRoute>

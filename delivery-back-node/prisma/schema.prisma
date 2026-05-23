@@ -49,18 +49,19 @@ enum DeletionReason {
 // ─── Ciudades ─────────────────────────────────────────────────────────────────
 
 model City {
-  id          Int      @id @default(autoincrement())
-  name        String   @unique
-  country     String   @default("Bolivia")
-  currency    String   @default("BOB") @db.VarChar(3)
-  is_active   Boolean  @default(true)
-  base_delivery_fee Decimal  @db.Decimal(10, 2)
-  center_lat_lng     String?
+  id                Int                                         @id @default(autoincrement())
+  name              String                                      @unique
+  country           String                                      @default("Bolivia")
+  currency          String                                      @default("BOB") @db.VarChar(3)
+  is_active         Boolean                                     @default(true)
+  base_delivery_fee Decimal                                     @db.Decimal(10, 2)
+  center_lat_lng    String?
   coverage_area     Unsupported("geometry(MultiPolygon, 4326)")
-  created_at        DateTime @default(now())
-  updated_at        DateTime         @updatedAt
+  created_at        DateTime                                    @default(now())
+  updated_at        DateTime                                    @updatedAt
 
   orders Order[]
+  zones  Zone[]
 
   @@map("cities")
 }
@@ -68,33 +69,33 @@ model City {
 // ─── Usuarios ─────────────────────────────────────────────────────────────────
 
 model User {
-  id                Int            @id @default(autoincrement())
+  id                Int           @id @default(autoincrement())
   name              String
-  email             String?        @unique
-  phone             String         @unique
+  email             String?       @unique
+  phone             String        @unique
   pin               String
-  transport_type    TransportType  @default(motorcycle)
-  role              Role           @default(driver)
-  status            UserStatus     @default(active)
-  points            Int            @default(0)
+  transport_type    TransportType @default(motorcycle)
+  role              Role          @default(driver)
+  status            UserStatus    @default(active)
+  points            Int           @default(0)
   phone_verified_at DateTime?
   email_verified_at DateTime?
   password          String?
   remember_token    String?
-  created_at        DateTime       @default(now())
-  updated_at        DateTime       @updatedAt
+  created_at        DateTime      @default(now())
+  updated_at        DateTime      @updatedAt
 
-  wallet            Wallet?
-  assignments       OrderAssignment[]
+  wallet      Wallet?
+  assignments OrderAssignment[]
 
   // Auditoría obligatoria para Play Store / Compliance
-  isActive          Boolean        @default(true)
-  deletedAt         DateTime?      // Soporte para Soft Delete
+  isActive  Boolean   @default(true)
+  deletedAt DateTime? // Soporte para Soft Delete
 
   // Relaciones de Cumplimiento Normativo
-  consents          UserConsent[]
-  deviceTokens      DeviceToken[]
-  accountDeletions  AccountDeletionRequest[]
+  consents         UserConsent[]
+  deviceTokens     DeviceToken[]
+  accountDeletions AccountDeletionRequest[]
 
   @@map("users")
 }
@@ -102,26 +103,26 @@ model User {
 // ─── Pedidos ──────────────────────────────────────────────────────────────────
 
 model Order {
-  id           Int               @id @default(autoincrement())
-  type         String            // ej: 'delivery', 'express'
-  client_name  String            @db.VarChar(100)
-  pickup       String            // Dirección de recogida
-  delivery     String            // Dirección de entrega
-  address      String?           @db.Text
-  address_metadata   Json?
-  delivery_fee Decimal           @db.Decimal(10, 2)
-  urgency      Urgency           @default(baja)
-  description  String?           @db.Text
-  currency     String            @default("BOB") @db.VarChar(3)
-  status       String            @default("pending") @db.VarChar(30)
-  duration     String?           @db.VarChar(30)
-  points       Int               @default(0)
-  city_id      Int               @default(1)
-  city         City              @relation(fields: [city_id], references: [id])
-  created_at   DateTime          @default(now())
-  updated_at   DateTime          @updatedAt
+  id               Int      @id @default(autoincrement())
+  type             String // ej: 'delivery', 'express'
+  client_name      String   @db.VarChar(100)
+  pickup           String // Dirección de recogida
+  delivery         String // Dirección de entrega
+  address          String?  @db.Text
+  address_metadata Json?
+  delivery_fee     Decimal  @db.Decimal(10, 2)
+  urgency          Urgency  @default(baja)
+  description      String?  @db.Text
+  currency         String   @default("BOB") @db.VarChar(3)
+  status           String   @default("pending") @db.VarChar(30)
+  duration         String?  @db.VarChar(30)
+  points           Int      @default(0)
+  city_id          Int      @default(1)
+  city             City     @relation(fields: [city_id], references: [id])
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
 
-  assignments  OrderAssignment[]
+  assignments OrderAssignment[]
 
   @@map("orders")
 }
@@ -136,8 +137,8 @@ model OrderAssignment {
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
-  order      Order    @relation(fields: [order_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  order Order @relation(fields: [order_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  user  User  @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
   @@map("order_assignments")
 }
@@ -145,13 +146,13 @@ model OrderAssignment {
 // ─── Billetera ────────────────────────────────────────────────────────────────
 
 model Wallet {
-  id         Int           @id @default(autoincrement())
-  user_id    Int           @unique
-  balance    Decimal       @default(0.00) @db.Decimal(15, 2)
-  currency   String        @default("BOB") @db.VarChar(3)
-  is_active  Boolean       @default(true)
-  created_at DateTime      @default(now())
-  updated_at DateTime      @updatedAt
+  id         Int      @id @default(autoincrement())
+  user_id    Int      @unique
+  balance    Decimal  @default(0.00) @db.Decimal(15, 2)
+  currency   String   @default("BOB") @db.VarChar(3)
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
 
   user         User          @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
   transactions Transaction[]
@@ -169,7 +170,7 @@ model Transaction {
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
-  wallet     Wallet   @relation(fields: [wallet_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  wallet Wallet @relation(fields: [wallet_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
   @@map("transactions")
 }
@@ -177,16 +178,16 @@ model Transaction {
 // ─── Zonas de Entrega ─────────────────────────────────────────────────────────
 
 model Zone {
-  id          Int      @id @default(autoincrement())
-  name        String
-  extra_rate  Decimal  @default(0) @db.Decimal(8, 2)
-  color       String   @default("#ff0000")
-  is_active   Boolean  @default(true)
-  polygon     Unsupported("geometry(Polygon, 4326)")
-  city_id     Int
-  created_at  DateTime @default(now())
-  updated_at  DateTime @updatedAt
-  city        City     @relation(fields: [city_id], references: [id])
+  id         Int                                    @id @default(autoincrement())
+  name       String
+  extra_rate Decimal                                @default(0) @db.Decimal(8, 2)
+  color      String                                 @default("#ff0000")
+  is_active  Boolean                                @default(true)
+  polygon    Unsupported("geometry(Polygon, 4326)")
+  city_id    Int
+  created_at DateTime                               @default(now())
+  updated_at DateTime                               @updatedAt
+  city       City                                   @relation(fields: [city_id], references: [id])
 
   @@map("zones")
 }
@@ -195,15 +196,15 @@ model Zone {
 
 // 1. Consentimientos explícitos del Usuario
 model UserConsent {
-  id              String         @id @default(uuid())
-  userId          Int
-  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  consentType     String         // e.g., "BACKGROUND_LOCATION", "PRIVACY_POLICY"
-  isGranted       Boolean        @default(false)
-  policyVersion   String
-  ipAddress       String?
-  grantedAt       DateTime       @default(now())
-  revokedAt       DateTime?
+  id            String    @id @default(uuid())
+  userId        Int
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  consentType   String // e.g., "BACKGROUND_LOCATION", "PRIVACY_POLICY"
+  isGranted     Boolean   @default(false)
+  policyVersion String
+  ipAddress     String?
+  grantedAt     DateTime  @default(now())
+  revokedAt     DateTime?
 
   @@unique([userId, consentType, policyVersion])
   @@index([consentType])
@@ -212,16 +213,16 @@ model UserConsent {
 
 // 2. Registro de dispositivos y Tokens de Notificación
 model DeviceToken {
-  id            String    @id @default(uuid())
-  userId        Int
-  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  token         String    @unique
-  deviceOs      String    // "ANDROID" o "IOS"
-  osVersion     String?
-  deviceModel   String?
-  isActive      Boolean   @default(true)
-  lastUsedAt    DateTime  @default(now())
-  createdAt     DateTime  @default(now())
+  id          String   @id @default(uuid())
+  userId      Int
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token       String   @unique
+  deviceOs    String // "ANDROID" o "IOS"
+  osVersion   String?
+  deviceModel String?
+  isActive    Boolean  @default(true)
+  lastUsedAt  DateTime @default(now())
+  createdAt   DateTime @default(now())
 
   @@index([userId])
   @@index([token])
@@ -230,15 +231,15 @@ model DeviceToken {
 
 // 3. Solicitudes de Eliminación de Cuenta
 model AccountDeletionRequest {
-  id            String          @id @default(uuid())
-  userId        Int
-  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  reason        DeletionReason
-  customReason  String?         @db.Text
-  status        String          @default("PENDING") // PENDING, PROCESSED, CANCELLED
-  scheduledFor  DateTime
-  createdAt     DateTime        @default(now())
-  processedAt   DateTime?
+  id           String         @id @default(uuid())
+  userId       Int
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reason       DeletionReason
+  customReason String?        @db.Text
+  status       String         @default("PENDING") // PENDING, PROCESSED, CANCELLED
+  scheduledFor DateTime
+  createdAt    DateTime       @default(now())
+  processedAt  DateTime?
 
   @@index([userId])
   @@index([status])
@@ -249,7 +250,7 @@ model AccountDeletionRequest {
 model AppPolicy {
   id          String   @id @default(uuid())
   title       String
-  type        String   // "TERMS", "PRIVACY", "LOCATION_DISCLOSURE"
+  type        String // "TERMS", "PRIVACY", "LOCATION_DISCLOSURE"
   version     String
   content     String   @db.Text
   isActive    Boolean  @default(false)

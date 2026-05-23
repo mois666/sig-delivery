@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Polygon, useMapEvents } from 'react-leaflet';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Trash2, Save, Map as MapIcon, Palette, DollarSign, CheckCircle2, MousePointerClick } from 'lucide-react';
@@ -22,9 +22,10 @@ interface ZoneModalProps {
     onClose: () => void;
     onSubmit: (zone: Zone) => void;
     initialData?: Zone | null;
+    cityCenter?: [number, number];
+    city?: any;
 }
 
-// Colores de zona predefinidos para selección rápida
 const PRESET_COLORS = [
     '#3b82f6', // blue
     '#f97316', // orange (primary)
@@ -36,52 +37,114 @@ const PRESET_COLORS = [
     '#ec4899', // pink
 ];
 
-export const ZoneModal = ({ isOpen, onClose, onSubmit, initialData }: ZoneModalProps) => {
+const getCoordsFromPolygon = (polygon: any): [number, number][] => {
+    if (!polygon || !polygon.coordinates || !polygon.coordinates[0]) return [];
+    return polygon.coordinates[0].slice(0, -1).map((pt: any) => [pt[1], pt[0]] as [number, number]);
+};
+
+const getZoneLeafletPositions = (polygonObj: any): L.LatLngExpression[] => {
+    if (!polygonObj || !polygonObj.coordinates || !polygonObj.coordinates[0]) return [];
+    return polygonObj.coordinates[0].map((pt: any) => [pt[1], pt[0]] as L.LatLngExpression);
+};
+
+const getCityPositions = (coverageArea: any): L.LatLngExpression[][] | L.LatLngExpression[] => {
+    if (!coverageArea || !coverageArea.coordinates) return [];
+    if (coverageArea.type === 'MultiPolygon') {
+        return coverageArea.coordinates.map((poly: any) =>
+            poly[0].map((pt: any) => [pt[1], pt[0]] as L.LatLngExpression)
+        );
+    } else if (coverageArea.type === 'Polygon') {
+        return coverageArea.coordinates[0].map((pt: any) => [pt[1], pt[0]] as L.LatLngExpression);
+    }
+    return [];
+};
+
+export const ZoneModal = ({ isOpen, onClose, onSubmit, initialData, cityCenter, city }: ZoneModalProps) => {
     const { zones } = useZoneStore();
 
-    const [form, setForm] = useState<Zone>(
-        initialData || {
-            name: '',
-            coordinates: [],
-            extra_rate: 0,
-            color: '#f97316',
-            is_active: true,
+    const [form, setForm] = useState<Partial<Zone>>({
+        name: '',
+        extra_rate: 0,
+        color: '#f97316',
+        is_active: true,
+    });
+    const [coordinates, setCoordinates] = useState<[number, number][]>([]);
+
+    useEffect(() => {
+        if (isOpen) {
+            if (initialData) {
+                setForm({
+                    id: initialData.id,
+                    name: initialData.name,
+                    extra_rate: initialData.extra_rate,
+                    color: initialData.color || '#f97316',
+                    is_active: initialData.is_active !== undefined ? initialData.is_active : true,
+                });
+                setCoordinates(getCoordsFromPolygon(initialData.polygon));
+            } else {
+                setForm({
+                    name: '',
+                    extra_rate: 0,
+                    color: '#f97316',
+                    is_active: true,
+                });
+                setCoordinates([]);
+            }
         }
-    );
+    }, [isOpen, initialData]);
 
     const MapEvents = () => {
         useMapEvents({
             click(e) {
                 const newPoint: [number, number] = [e.latlng.lat, e.latlng.lng];
-                setForm((prev) => ({ ...prev, coordinates: [...prev.coordinates, newPoint] }));
+                setCoordinates((prev) => [...prev, newPoint]);
             },
         });
         return null;
     };
 
-    const clearPoints = () => setForm((prev) => ({ ...prev, coordinates: [] }));
+    const clearPoints = () => setCoordinates([]);
 
-    const removeLastPoint = () =>
-        setForm((prev) => ({ ...prev, coordinates: prev.coordinates.slice(0, -1) }));
+    const removeLastPoint = () => setCoordinates((prev) => prev.slice(0, -1));
 
     const handleAction = (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
+        if (coordinates.length < 3) {
+            alert('Se requieren al menos 3 puntos para delimitar una zona.');
+            return;
+        }
+
         const formData = new FormData(e.currentTarget);
-        onSubmit({
+        
+        // Convert coords to GeoJSON Polygon format [lng, lat] closed loop
+        const geojsonCoords = [
+            [...coordinates.map(pt => [pt[1], pt[0]]), [coordinates[0][1], coordinates[0][0]]]
+        ];
+
+        const geojson = {
+            type: 'Polygon',
+            coordinates: geojsonCoords
+        };
+
+        const payload: any = {
             ...form,
             name: formData.get('name') as string,
             extra_rate: Number(formData.get('extra_rate')),
-        });
+            polygon: geojson,
+        };
+
+        onSubmit(payload);
     };
 
-    const pointsNeeded = Math.max(0, 3 - form.coordinates.length);
-    const isReady = form.coordinates.length >= 3;
+    const pointsNeeded = Math.max(0, 3 - coordinates.length);
+    const isReady = coordinates.length >= 3;
+    const mapCenter = coordinates.length > 0 ? coordinates[0] : (cityCenter || [-17.9647, -67.106]);
 
     return (
         <Modal isOpen={isOpen}>
             <Modal.Backdrop className="bg-black/80 backdrop-blur-sm">
                 <Modal.Container>
-                    <Modal.Dialog className="w-full max-w-4xl bg-background border border-divider rounded-[24px] overflow-hidden flex flex-col max-h-[95vh]">
+                    <Modal.Dialog className="w-full max-w-4xl bg-background border border-divider rounded-[24px] overflow-hidden flex flex-col max-h-[95vh] text-foreground">
                         <Modal.CloseTrigger onPress={onClose} className="top-4 right-4 text-muted-foreground hover:text-foreground" />
 
                         {/* Header */}
@@ -102,40 +165,57 @@ export const ZoneModal = ({ isOpen, onClose, onSubmit, initialData }: ZoneModalP
                                 {/* ── Mapa Interactivo ────────────────────────────────────── */}
                                 <div className="h-[45vh] w-full relative border-b border-divider flex-shrink-0">
                                     <MapContainer
-                                        center={form.coordinates.length > 0 ? form.coordinates[0] : [-17.9647, -67.106]}
+                                        center={mapCenter}
+                                        key={`${mapCenter[0]}-${mapCenter[1]}`}
                                         zoom={13}
                                         style={{ height: '100%', width: '100%' }}
                                     >
                                         <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                                         <MapEvents />
 
-                                        {/* Zonas existentes (referencia) */}
-                                        {zones.map(
-                                            (zone) =>
-                                                zone.id !== initialData?.id && (
-                                                    <Polygon
-                                                        key={zone.id}
-                                                        positions={zone.coordinates}
-                                                        pathOptions={{
-                                                            color: zone.color,
-                                                            fillColor: zone.color,
-                                                            fillOpacity: 0.1,
-                                                            dashArray: '5, 10',
-                                                            weight: 1.5,
-                                                        }}
-                                                    />
-                                                )
+                                        {/* Cobertura de la Ciudad (Referencia en Amarillo) */}
+                                        {city && city.coverage_area && (
+                                            <Polygon
+                                                positions={getCityPositions(city.coverage_area)}
+                                                pathOptions={{
+                                                    color: '#eab308', // Amarillo
+                                                    fillColor: '#eab308',
+                                                    fillOpacity: 0.15,
+                                                    weight: 3,
+                                                    dashArray: '5, 5'
+                                                }}
+                                            />
                                         )}
 
+                                        {/* Zonas existentes (referencia) */}
+                                        {zones.map((zone) => {
+                                            if (zone.id === initialData?.id || !zone.polygon) return null;
+                                            const positions = getZoneLeafletPositions(zone.polygon);
+                                            if (positions.length === 0) return null;
+                                            return (
+                                                <Polygon
+                                                    key={zone.id}
+                                                    positions={positions}
+                                                    pathOptions={{
+                                                        color: zone.color,
+                                                        fillColor: zone.color,
+                                                        fillOpacity: 0.1,
+                                                        dashArray: '5, 10',
+                                                        weight: 1.5,
+                                                    }}
+                                                />
+                                            );
+                                        })}
+
                                         {/* Marcadores de puntos actuales */}
-                                        {form.coordinates.map((p, i) => (
+                                        {coordinates.map((p, i) => (
                                             <Marker key={i} position={p} />
                                         ))}
 
                                         {/* Polígono en progreso */}
-                                        {form.coordinates.length > 2 && (
+                                        {coordinates.length > 2 && (
                                             <Polygon
-                                                positions={form.coordinates}
+                                                positions={coordinates}
                                                 pathOptions={{
                                                     color: form.color,
                                                     fillColor: form.color,
@@ -162,7 +242,7 @@ export const ZoneModal = ({ isOpen, onClose, onSubmit, initialData }: ZoneModalP
                                                     }`}
                                             >
                                                 {isReady ? (
-                                                    <CheckCircle2 className="w-3 h-3" />
+                                                    <CheckCircle2 className="w-3 h-3 animate-pulse" />
                                                 ) : (
                                                     <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
                                                 )}
@@ -171,25 +251,25 @@ export const ZoneModal = ({ isOpen, onClose, onSubmit, initialData }: ZoneModalP
                                         </AnimatePresence>
 
                                         {/* Puntos colocados */}
-                                        {form.coordinates.length > 0 && (
+                                        {coordinates.length > 0 && (
                                             <motion.div
                                                 initial={{ opacity: 0 }}
                                                 animate={{ opacity: 1 }}
                                                 className="px-3 py-1.5 rounded-full border bg-black/70 border-white/10 text-[10px] font-bold text-white backdrop-blur flex gap-1.5 items-center"
                                             >
                                                 <MousePointerClick className="w-3 h-3 text-primary" />
-                                                {form.coordinates.length} punto{form.coordinates.length !== 1 ? 's' : ''} marcado{form.coordinates.length !== 1 ? 's' : ''}
+                                                {coordinates.length} punto{coordinates.length !== 1 ? 's' : ''} marcado{coordinates.length !== 1 ? 's' : ''}
                                             </motion.div>
                                         )}
                                     </div>
 
-                                    {/* Botón quitar último punto */}
-                                    {form.coordinates.length > 0 && (
+                                    {/* Botón deshacer último punto */}
+                                    {coordinates.length > 0 && (
                                         <div className="absolute top-4 right-4 z-[500]">
                                             <button
                                                 type="button"
                                                 onClick={removeLastPoint}
-                                                className="bg-black/70 border border-white/10 backdrop-blur text-white text-[10px] font-bold px-3 py-1.5 rounded-full hover:bg-danger/30 hover:border-danger/40 hover:text-danger transition-all"
+                                                className="bg-black/70 border border-white/10 backdrop-blur text-white text-[10px] font-bold px-3 py-1.5 rounded-full hover:bg-danger/30 hover:border-danger/40 hover:text-danger transition-all cursor-pointer"
                                             >
                                                 ↩ Deshacer punto
                                             </button>
@@ -208,7 +288,7 @@ export const ZoneModal = ({ isOpen, onClose, onSubmit, initialData }: ZoneModalP
                                             <TextField
                                                 isRequired
                                                 name="name"
-                                                defaultValue={initialData?.name || ''}
+                                                defaultValue={form.name || ''}
                                                 validate={(value) => {
                                                     if (!value || value.length < 3) return 'Mínimo 3 caracteres';
                                                     return null;
@@ -223,21 +303,21 @@ export const ZoneModal = ({ isOpen, onClose, onSubmit, initialData }: ZoneModalP
                                             <TextField
                                                 isRequired
                                                 name="extra_rate"
-                                                defaultValue={(initialData?.extra_rate ?? 0).toString()}
+                                                defaultValue={(form.extra_rate ?? 0).toString()}
                                                 validate={(value) => {
                                                     if (isNaN(Number(value)) || Number(value) < 0)
                                                         return 'Debe ser un número válido (≥ 0)';
                                                     return null;
                                                 }}
                                             >
-                                                <Label>Recargo Adicional (Bs)</Label>
+                                                <Label>Recargo Adicional</Label>
                                                 <Input
                                                     type="number"
                                                     step="0.5"
                                                     min="0"
                                                     placeholder="0.00"
                                                     variant="flat"
-                                                    startContent={<DollarSign className="w-4 h-4 text-muted-foreground" />}
+                                                    startContent={<DollarSign className="w-4 h-4 text-muted-foreground mr-1" />}
                                                 />
                                                 <Description>Costo extra que se suma al precio base por zona</Description>
                                                 <FieldError />
@@ -273,7 +353,7 @@ export const ZoneModal = ({ isOpen, onClose, onSubmit, initialData }: ZoneModalP
                                                                 whileTap={{ scale: 0.85 }}
                                                                 whileHover={{ scale: 1.15 }}
                                                                 transition={{ type: 'spring', stiffness: 400, damping: 20 }}
-                                                                className="w-8 h-8 rounded-xl border-2 transition-all"
+                                                                className="w-8 h-8 rounded-xl border-2 transition-all cursor-pointer"
                                                                 style={{
                                                                     backgroundColor: c,
                                                                     borderColor: form.color === c ? 'white' : 'transparent',
@@ -294,7 +374,7 @@ export const ZoneModal = ({ isOpen, onClose, onSubmit, initialData }: ZoneModalP
                                                     }}
                                                 >
                                                     <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: form.color }} />
-                                                    Vista previa del color de zona
+                                                    Vista previa del color de zona en el mapa
                                                 </div>
                                             </div>
 
@@ -304,10 +384,9 @@ export const ZoneModal = ({ isOpen, onClose, onSubmit, initialData }: ZoneModalP
                                         <Fieldset.Actions>
                                             <Button
                                                 type="submit"
-                                                isDisabled={form.coordinates.length < 3}
+                                                isDisabled={coordinates.length < 3}
                                                 size="lg"
-                                                color="primary"
-                                                className="flex-[2] h-12 font-black text-white rounded-xl shadow-lg shadow-primary/20"
+                                                className="flex-[2] h-12 font-black text-white rounded-xl shadow-lg bg-primary shadow-primary/20 cursor-pointer"
                                             >
                                                 <Save className="w-4 h-4 mr-1" />
                                                 {initialData ? 'Guardar Cambios' : 'Crear Zona'}
@@ -316,9 +395,8 @@ export const ZoneModal = ({ isOpen, onClose, onSubmit, initialData }: ZoneModalP
                                                 type="button"
                                                 onPress={clearPoints}
                                                 variant="flat"
-                                                color="danger"
                                                 size="lg"
-                                                className="flex-1 h-12 font-bold rounded-xl"
+                                                className="flex-1 h-12 font-bold rounded-xl bg-danger/20 hover:bg-danger/30 text-danger border border-danger/30 cursor-pointer"
                                             >
                                                 <Trash2 className="w-4 h-4 mr-1" />
                                                 Limpiar

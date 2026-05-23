@@ -52,7 +52,7 @@ export const useAuthStore = create<AuthState>()(
       login: async ({ phone, pin, city_id }) => {
         set({ isLoading: true, error: null });
         try {
-          const { data } = await appDB.post('/auth/login', { phone, pin });
+          const { data } = await appDB.post('/auth/login', { phone, pin, city_id });
 
           // El backend devuelve user con la relación city completa
           const userWithCity: User = {

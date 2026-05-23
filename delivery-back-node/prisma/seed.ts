@@ -1,4 +1,4 @@
-import { PrismaClient, Prisma } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import dotenv from 'dotenv';
 
@@ -7,34 +7,36 @@ dotenv.config();
 const prisma = new PrismaClient();
 const domain = process.env.APP_DOMAIN || 'depedidos.com';
 
-const CITIES = [
-  { name: 'Oruro', country: 'Bolivia', currency: 'BOB', timezone: 'America/La_Paz', coordinates: [] },
-  { name: 'La Paz', country: 'Bolivia', currency: 'BOB', timezone: 'America/La_Paz', coordinates: [] },
-  { name: 'Cochabamba', country: 'Bolivia', currency: 'BOB', timezone: 'America/La_Paz', coordinates: [] },
-  { name: 'Santa Cruz', country: 'Bolivia', currency: 'BOB', timezone: 'America/La_Paz', coordinates: [] },
-  { name: 'Potosí', country: 'Bolivia', currency: 'BOB', timezone: 'America/La_Paz', coordinates: [] },
-  { name: 'Sucre', country: 'Bolivia', currency: 'BOB', timezone: 'America/La_Paz', coordinates: [] },
-  { name: 'Tarija', country: 'Bolivia', currency: 'BOB', timezone: 'America/La_Paz', coordinates: [] },
-  { name: 'Trinidad', country: 'Bolivia', currency: 'BOB', timezone: 'America/La_Paz', coordinates: [] },
-  { name: 'Beni', country: 'Bolivia', currency: 'BOB', timezone: 'America/La_Paz', coordinates: [] },
-  { name: 'Cobija', country: 'Bolivia', currency: 'BOB', timezone: 'America/La_Paz', coordinates: [] },
-];
-
 async function main() {
-  console.log('Creando ciudades...');
+  console.log('Creando ciudad Oruro...');
+  
+  const oruroCity = {
+    name: 'Oruro',
+    country: 'Bolivia',
+    currency: 'BOB',
+    lat: -17.9647,
+    lng: -67.1060,
+    base_delivery_fee: 10.00
+  };
 
-  // Crear ciudades una a una con upsert para evitar duplicados
-  for (const city of CITIES) {
-    await prisma.city.upsert({
-      where: { name: city.name },
-      update: {},
-      create: city,
-    });
-  }
+  const center_lat_lng = `${oruroCity.lat},${oruroCity.lng}`;
+  const minLng = oruroCity.lng - 0.15;
+  const maxLng = oruroCity.lng + 0.15;
+  const minLat = oruroCity.lat - 0.15;
+  const maxLat = oruroCity.lat + 0.15;
+  const wkt = `MULTIPOLYGON(((${minLng} ${minLat}, ${maxLng} ${minLat}, ${maxLng} ${maxLat}, ${minLng} ${maxLat}, ${minLng} ${minLat})))`;
 
-  // Obtener ID de Oruro para los usuarios seed
-  const oruro = await prisma.city.findUnique({ where: { name: 'Oruro' } });
-  if (!oruro) throw new Error('Ciudad Oruro no encontrada tras el seed');
+  await prisma.$executeRawUnsafe(`
+    INSERT INTO cities (name, country, currency, is_active, base_delivery_fee, center_lat_lng, coverage_area, created_at, updated_at)
+    VALUES ($1, $2, $3, true, $4, $5, ST_GeomFromText($6, 4326), NOW(), NOW())
+    ON CONFLICT (name) DO UPDATE SET
+      country = EXCLUDED.country,
+      currency = EXCLUDED.currency,
+      base_delivery_fee = EXCLUDED.base_delivery_fee,
+      center_lat_lng = EXCLUDED.center_lat_lng,
+      coverage_area = EXCLUDED.coverage_area,
+      updated_at = NOW();
+  `, oruroCity.name, oruroCity.country, oruroCity.currency, oruroCity.base_delivery_fee, center_lat_lng, wkt);
 
   const driverPin = await bcrypt.hash('1234', 10);
   const adminPin = await bcrypt.hash('4321', 10);
@@ -71,7 +73,7 @@ async function main() {
     },
   });
 
-  console.log('Seeding terminado: Ciudades y usuarios creados correctamente.');
+  console.log('Seeding terminado: Ciudad Oruro y usuarios creados correctamente.');
 }
 
 main()

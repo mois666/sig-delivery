@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import prisma from '../../../lib/prisma';
+import axios from 'axios';
 
 export class OrderController {
   static async index(req: Request, res: Response) {
@@ -20,6 +21,53 @@ export class OrderController {
     const io = (req as any).io;
 
     try {
+      // Intenta generar address_metadata usando Nominatim si hay coordenadas de entrega
+      if (data.delivery && typeof data.delivery === 'string' && data.delivery.includes(',')) {
+        try {
+          const [latStr, lngStr] = data.delivery.split(',');
+          const lat = parseFloat(latStr.trim());
+          const lng = parseFloat(lngStr.trim());
+
+          if (!isNaN(lat) && !isNaN(lng)) {
+            let city_name = 'Oruro';
+            let country_name = 'Bolivia';
+            let formatted_address = data.address || 'Avenida Cívica, Oruro, Bolivia';
+
+            try {
+              // Hacemos GET a Nominatim para reverse geocoding con axios
+              const response = await axios.get(
+                `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
+                {
+                  headers: {
+                    'User-Agent': 'DepedidosDeliveryApp/1.0 (acolque@depedidos.com)'
+                  }
+                }
+              );
+              
+              if (response.data) {
+                const geoData = response.data;
+                if (geoData.address) {
+                  city_name = geoData.address.city || geoData.address.town || geoData.address.village || city_name;
+                  country_name = geoData.address.country || country_name;
+                }
+                formatted_address = geoData.display_name || formatted_address;
+              }
+            } catch (fetchErr) {
+              console.error('Error al consultar Nominatim para address_metadata:', fetchErr);
+            }
+
+            data.address_metadata = {
+              city_name,
+              country_name,
+              formatted_address,
+              coordinates: { lat, lng }
+            };
+          }
+        } catch (metaErr) {
+          console.error('Error al estructurar address_metadata:', metaErr);
+        }
+      }
+
       const order = await prisma.order.create({
         data,
       });

@@ -22,9 +22,10 @@ CREATE TABLE "cities" (
     "name" TEXT NOT NULL,
     "country" TEXT NOT NULL DEFAULT 'Bolivia',
     "currency" VARCHAR(3) NOT NULL DEFAULT 'BOB',
-    "timezone" TEXT NOT NULL DEFAULT 'America/La_Paz',
     "is_active" BOOLEAN NOT NULL DEFAULT true,
-    "coordinates" JSONB NOT NULL,
+    "base_delivery_fee" DECIMAL(10,2) NOT NULL,
+    "center_lat_lng" TEXT,
+    "coverage_area" geometry(MultiPolygon, 4326) NOT NULL,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
 
@@ -62,6 +63,7 @@ CREATE TABLE "orders" (
     "pickup" TEXT NOT NULL,
     "delivery" TEXT NOT NULL,
     "address" TEXT,
+    "address_metadata" JSONB,
     "delivery_fee" DECIMAL(10,2) NOT NULL,
     "urgency" "Urgency" NOT NULL DEFAULT 'baja',
     "description" TEXT,
@@ -112,7 +114,6 @@ CREATE TABLE "transactions" (
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
 
-
     CONSTRAINT "transactions_pkey" PRIMARY KEY ("id")
 );
 
@@ -120,10 +121,11 @@ CREATE TABLE "transactions" (
 CREATE TABLE "zones" (
     "id" SERIAL NOT NULL,
     "name" TEXT NOT NULL,
-    "coordinates" JSONB NOT NULL,
     "extra_rate" DECIMAL(8,2) NOT NULL DEFAULT 0,
     "color" TEXT NOT NULL DEFAULT '#ff0000',
     "is_active" BOOLEAN NOT NULL DEFAULT true,
+    "polygon" geometry(Polygon, 4326) NOT NULL,
+    "city_id" INTEGER NOT NULL,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
 
@@ -199,10 +201,10 @@ CREATE UNIQUE INDEX "users_phone_key" ON "users"("phone");
 CREATE UNIQUE INDEX "wallets_user_id_key" ON "wallets"("user_id");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "user_consents_userId_consentType_policyVersion_key" ON "user_consents"("userId", "consentType", "policyVersion");
+CREATE INDEX "user_consents_consentType_idx" ON "user_consents"("consentType");
 
 -- CreateIndex
-CREATE INDEX "user_consents_consentType_idx" ON "user_consents"("consentType");
+CREATE UNIQUE INDEX "user_consents_userId_consentType_policyVersion_key" ON "user_consents"("userId", "consentType", "policyVersion");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "device_tokens_token_key" ON "device_tokens"("token");
@@ -223,8 +225,6 @@ CREATE INDEX "account_deletion_requests_status_idx" ON "account_deletion_request
 CREATE UNIQUE INDEX "app_policies_type_version_key" ON "app_policies"("type", "version");
 
 -- AddForeignKey
-
--- AddForeignKey
 ALTER TABLE "orders" ADD CONSTRAINT "orders_city_id_fkey" FOREIGN KEY ("city_id") REFERENCES "cities"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -238,6 +238,9 @@ ALTER TABLE "wallets" ADD CONSTRAINT "wallets_user_id_fkey" FOREIGN KEY ("user_i
 
 -- AddForeignKey
 ALTER TABLE "transactions" ADD CONSTRAINT "transactions_wallet_id_fkey" FOREIGN KEY ("wallet_id") REFERENCES "wallets"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "zones" ADD CONSTRAINT "zones_city_id_fkey" FOREIGN KEY ("city_id") REFERENCES "cities"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "user_consents" ADD CONSTRAINT "user_consents_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;

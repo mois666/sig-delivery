@@ -18,7 +18,6 @@ export const Sidebar = () => {
     { name: "Dashboard", path: "/admin", icon: LayoutDashboard },
     { name: "Usuarios", path: "/users", icon: Users },
     { name: "Ciudades", path: "/cities", icon: Globe },
-    { name: "Zonas", path: "/zone", icon: Map },
     { name: "Pedidos", path: "/orders", icon: ClipboardList },
     { name: "Billetera", path: "/wallet", icon: Wallet },
     { name: "Ranking", path: "/ranking", icon: Trophy },

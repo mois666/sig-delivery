@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { MapContainer, TileLayer, Polygon, Popup, Marker } from 'react-leaflet';
-import { Plus, Globe, Trash2, Edit2, Info, RefreshCw, X } from 'lucide-react';
+import { Plus, Globe, Trash2, Edit2, Info, RefreshCw, X, Eye } from 'lucide-react';
 import { Button, cn, Modal } from '@heroui/react';
 import { useCityStore } from '@/stores/cityStore';
 import { CityModal } from '@/components/modals/CityModal';
@@ -22,6 +23,18 @@ const DefaultIcon = L.icon({
 });
 L.Marker.prototype.options.icon = DefaultIcon;
 
+const getLeafletPositions = (coverageArea: any): L.LatLngExpression[][] | L.LatLngExpression[] => {
+  if (!coverageArea || !coverageArea.coordinates) return [];
+  if (coverageArea.type === 'MultiPolygon') {
+    return coverageArea.coordinates.map((poly: any) =>
+      poly[0].map((pt: any) => [pt[1], pt[0]] as L.LatLngExpression)
+    );
+  } else if (coverageArea.type === 'Polygon') {
+    return coverageArea.coordinates[0].map((pt: any) => [pt[1], pt[0]] as L.LatLngExpression);
+  }
+  return [];
+};
+
 const CITY_COLORS = [
   '#0070F0', // Primary Blue
   '#17C964', // Success Green
@@ -34,10 +47,11 @@ const CITY_COLORS = [
 ];
 
 export const AdminCities = () => {
+  const navigate = useNavigate();
   const { cities, fetchCities, saveCity, deleteCity, isLoading } = useCityStore();
   const [showModal, setShowModal] = useState(false);
   const [selectedCity, setSelectedCity] = useState<ICity | null>(null);
-  
+
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [cityToDelete, setCityToDelete] = useState<ICity | null>(null);
 
@@ -117,14 +131,16 @@ export const AdminCities = () => {
           >
             <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
             {cities
-              .filter(city => city.is_active && Array.isArray(city.coordinates) && city.coordinates.length > 0)
+              .filter(city => city.is_active && city.coverage_area && city.coverage_area.coordinates)
               .map((city, index) => {
                 const color = CITY_COLORS[index % CITY_COLORS.length];
-                
+                const positions = getLeafletPositions(city.coverage_area);
+                if (!positions || positions.length === 0) return null;
+
                 return (
                   <Polygon
                     key={city.id}
-                    positions={city.coordinates}
+                    positions={positions}
                     pathOptions={{
                       color: color,
                       fillColor: color,
@@ -148,19 +164,24 @@ export const AdminCities = () => {
 
             {/* City Markers for quickly finding them on map */}
             {cities
-              .filter(city => Array.isArray(city.coordinates) && city.coordinates.length > 0)
-              .map((city) => (
-                <Marker 
-                  key={`marker-${city.id}`} 
-                  position={city.coordinates[0]}
-                >
-                  <Popup>
-                    <div className="p-1 text-foreground font-semibold text-xs">
-                      {city.name}
-                    </div>
-                  </Popup>
-                </Marker>
-              ))}
+              .filter(city => city.center_lat_lng)
+              .map((city) => {
+                const [lat, lng] = city.center_lat_lng.split(',').map(Number);
+                if (isNaN(lat) || isNaN(lng)) return null;
+
+                return (
+                  <Marker
+                    key={`marker-${city.id}`}
+                    position={[lat, lng]}
+                  >
+                    <Popup>
+                      <div className="p-1 text-foreground font-semibold text-xs">
+                        {city.name}
+                      </div>
+                    </Popup>
+                  </Marker>
+                );
+              })}
           </MapContainer>
 
           {/* Floating Indicator */}
@@ -174,10 +195,11 @@ export const AdminCities = () => {
       {/* Cities Dashboard Grid */}
       <div className="px-6 space-y-4">
         <h2 className="text-xs uppercase font-bold text-muted-foreground ml-1 tracking-widest">Listado de Coberturas</h2>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {cities.map((city, index) => {
-            const pointsCount = Array.isArray(city.coordinates) ? city.coordinates.length : 0;
+            const pointsCount = city.coverage_area?.coordinates?.[0]?.[0]?.length ||
+              (city.coverage_area?.coordinates?.[0]?.length) || 0;
             const color = CITY_COLORS[index % CITY_COLORS.length];
 
             return (
@@ -186,17 +208,17 @@ export const AdminCities = () => {
                 initial={{ opacity: 0, y: 15 }}
                 animate={{ opacity: 1, y: 0 }}
                 className={cn(
-                  "glass-card p-5 border border-divider hover:border-default-300 transition-all rounded-3xl relative overflow-hidden shadow-md flex flex-col justify-between h-[180px]",
+                  "glass-card p-2 border border-divider hover:border-default-300 transition-all rounded-3xl relative overflow-hidden shadow-md flex flex-col justify-between h-[180px]",
                   !city.is_active && "opacity-60"
                 )}
               >
                 {/* Visual indicator stripe */}
-                <div 
-                  className="absolute top-0 left-0 right-0 h-1.5" 
+                <div
+                  className="absolute top-0 left-0 right-0 h-1.5"
                   style={{ backgroundColor: city.is_active ? color : '#3F3F46' }}
                 />
 
-                 {/* Delete button (X) in top-right */}
+                {/* Delete button (X) in top-right */}
                 <button
                   type="button"
                   onClick={(e) => {
@@ -214,11 +236,11 @@ export const AdminCities = () => {
                     <h3 className="font-bold text-lg leading-tight">{city.name}</h3>
                     <p className="text-xs text-muted-foreground font-semibold">{city.country} • Moneda: {city.currency}</p>
                   </div>
-                  
+
                   <span className={cn(
                     "px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase border",
-                    city.is_active 
-                      ? "bg-success/20 text-success border-success/30" 
+                    city.is_active
+                      ? "bg-success/20 text-success border-success/30"
                       : "bg-danger/20 text-danger border-danger/30"
                   )}>
                     {city.is_active ? 'Activa' : 'Inactiva'}
@@ -233,8 +255,10 @@ export const AdminCities = () => {
                     </p>
                   </div>
                   <div className="flex-1">
-                    <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Huso Horario</p>
-                    <p className="text-xs font-semibold text-foreground/80 truncate">{city.timezone}</p>
+                    <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Tarifa Base</p>
+                    <p className="text-xs font-semibold text-foreground/80 truncate">
+                      {city.currency} {city.base_delivery_fee}
+                    </p>
                   </div>
                 </div>
 
@@ -245,21 +269,34 @@ export const AdminCities = () => {
                     onClick={() => handleToggleActive(city)}
                     className={cn(
                       "rounded-xl text-[10px] font-black uppercase h-8 px-3 flex-1 border",
-                      city.is_active 
-                        ? "bg-danger/10 hover:bg-danger/20 text-danger border-danger/20" 
+                      city.is_active
+                        ? "bg-danger/10 hover:bg-danger/20 text-danger border-danger/20"
                         : "bg-success/10 hover:bg-success/20 text-success border-success/20"
                     )}
                   >
                     {city.is_active ? 'Desactivar' : 'Activar'}
                   </Button>
-                  
+
                   <Button
                     size="sm"
                     variant="flat"
+                    isIconOnly
                     onClick={() => handleEdit(city)}
-                    className="bg-default-100 hover:bg-default-200 text-foreground rounded-xl text-[10px] font-black uppercase h-8 px-4 flex-1 border border-divider"
+                    className="bg-default-100 hover:bg-default-200 text-foreground rounded-xl h-8 w-8 min-w-[32px] border border-divider flex items-center justify-center"
+                    title="Editar Ciudad"
                   >
-                    <Edit2 className="w-3 h-3 mr-1 text-primary" /> Editar
+                    <Edit2 className="w-3.5 h-3.5 text-primary" />
+                  </Button>
+
+                  <Button
+                    size="sm"
+                    variant="flat"
+                    isIconOnly
+                    onClick={() => navigate(`/cities/zones?cityId=${city.id}`)}
+                    className="bg-default-100 hover:bg-default-200 text-foreground rounded-xl h-8 w-8 min-w-[32px] border border-divider flex items-center justify-center"
+                    title="Ver Zonas de Recargo"
+                  >
+                    <Eye className="w-3.5 h-3.5 text-foreground" />
                   </Button>
                 </div>
               </motion.div>
@@ -295,7 +332,7 @@ export const AdminCities = () => {
               <Modal.Container>
                 <Modal.Dialog className="w-full max-w-md bg-background border border-divider rounded-[24px] overflow-hidden flex flex-col text-foreground p-6">
                   <Modal.CloseTrigger onPress={() => setShowDeleteConfirm(false)} className="top-4 right-4 text-muted-foreground hover:text-foreground" />
-                  
+
                   <div className="flex flex-col items-center text-center space-y-4 py-4">
                     <div className="w-12 h-12 rounded-full bg-danger/10 flex items-center justify-center border border-danger/20 text-danger">
                       <Trash2 className="w-6 h-6" />

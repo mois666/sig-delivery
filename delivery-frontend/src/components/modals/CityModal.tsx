@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { MapContainer, TileLayer, Polygon, Marker, useMapEvents, useMap } from 'react-leaflet';
 import {
   Button,
-  Description,
   FieldError,
   Fieldset,
   Form,
@@ -12,8 +11,10 @@ import {
   TextField,
 } from '@heroui/react';
 import { ICity } from '@/interfaces/city-interface';
-import { Save, X, Trash2, MapPin, Globe } from 'lucide-react';
+import { Save, X, Trash2, MapPin, Globe, DollarSign } from 'lucide-react';
 import L from 'leaflet';
+
+import 'leaflet/dist/leaflet.css';
 
 // Fix for default Leaflet marker icons in Vite
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
@@ -33,6 +34,43 @@ interface CityModalProps {
   initialData: ICity | null;
   onSubmit: (data: Partial<ICity>) => Promise<boolean>;
 }
+
+const LATAM_CURRENCIES = [
+  { id: 'BOB', label: 'Boliviano (Bolivia)' },
+  { id: 'ARS', label: 'Peso Argentino (Argentina)' },
+  { id: 'CLP', label: 'Peso Chileno (Chile)' },
+  { id: 'COP', label: 'Peso Colombiano (Colombia)' },
+  { id: 'PEN', label: 'Sol Peruano (Perú)' },
+  { id: 'BRL', label: 'Real Brasileño (Brasil)' },
+  { id: 'MXN', label: 'Peso Mexicano (México)' },
+  { id: 'PYG', label: 'Guaraní (Paraguay)' },
+  { id: 'UYU', label: 'Peso Uruguayo (Uruguay)' },
+];
+
+const getCentroid = (points: [number, number][]): [number, number] => {
+  if (!points || points.length === 0) return [-17.9647, -67.1060];
+  let latSum = 0;
+  let lngSum = 0;
+  points.forEach(([lat, lng]) => {
+    latSum += lat;
+    lngSum += lng;
+  });
+  return [latSum / points.length, lngSum / points.length];
+};
+
+const getCoordsFromCoverageArea = (coverageArea: any): [number, number][] => {
+  if (!coverageArea || !coverageArea.coordinates || !coverageArea.coordinates[0]) return [];
+  
+  let list = coverageArea.coordinates[0];
+  // Handle MultiPolygon depth if nested inside polygon list
+  if (coverageArea.type === 'MultiPolygon') {
+    list = coverageArea.coordinates[0][0];
+  }
+  
+  if (!Array.isArray(list)) return [];
+  // Return list mapped to [lat, lng] while removing the duplicated closing coordinate of GeoJSON
+  return list.slice(0, -1).map((pt: any) => [pt[1], pt[0]] as [number, number]);
+};
 
 // Map helper to handle map clicks for drawing
 function MapDrawEvents({ onMapClick, isDrawing }: { onMapClick: (latlng: L.LatLng) => void; isDrawing: boolean }) {
@@ -60,41 +98,84 @@ export const CityModal = ({ isOpen, onClose, initialData, onSubmit }: CityModalP
     name: '',
     country: 'Bolivia',
     currency: 'BOB',
-    timezone: 'America/La_Paz',
-    coordinates: [],
+    base_delivery_fee: 10.00,
+    center_lat_lng: '',
   });
+  const [coordinates, setCoordinates] = useState<[number, number][]>([]);
   const [isDrawing, setIsDrawing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
-      setForm(initialData || {
-        name: '',
-        country: 'Bolivia',
-        currency: 'BOB',
-        timezone: 'America/La_Paz',
-        coordinates: [],
-      });
-      setIsDrawing(!initialData);
+      if (initialData) {
+        setForm({
+          name: initialData.name,
+          country: initialData.country,
+          currency: initialData.currency,
+          base_delivery_fee: initialData.base_delivery_fee,
+          center_lat_lng: initialData.center_lat_lng,
+        });
+        setCoordinates(getCoordsFromCoverageArea(initialData.coverage_area));
+        setIsDrawing(false);
+      } else {
+        setForm({
+          name: '',
+          country: 'Bolivia',
+          currency: 'BOB',
+          base_delivery_fee: 10.00,
+          center_lat_lng: '',
+        });
+        setCoordinates([]);
+        setIsDrawing(true);
+      }
     }
   }, [isOpen, initialData]);
 
+  // Reactive Centroid Nominatim autofill
+  useEffect(() => {
+    const fetchGeoData = async () => {
+      if (coordinates.length >= 3) {
+        const [lat, lng] = getCentroid(coordinates);
+        try {
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
+            { headers: { 'User-Agent': 'DepedidosDeliveryApp/1.0 (acolque@depedidos.com)' } }
+          );
+          if (response.ok) {
+            const data = await response.json();
+            const cityName = data.address?.city || data.address?.town || data.address?.village || '';
+            const countryName = data.address?.country || 'Bolivia';
+            
+            setForm(prev => ({
+              ...prev,
+              name: prev.name ? prev.name : cityName, // don't overwrite if manual typing exists
+              country: countryName,
+              center_lat_lng: `${lat.toFixed(6)},${lng.toFixed(6)}`
+            }));
+          }
+        } catch (error) {
+          console.error('Nominatim lookup error:', error);
+        }
+      }
+    };
+    
+    const delayDebounceFn = setTimeout(() => {
+      fetchGeoData();
+    }, 800);
+    
+    return () => clearTimeout(delayDebounceFn);
+  }, [coordinates]);
+
   const handleMapClick = (latlng: L.LatLng) => {
-    setForm((prev) => ({
-      ...prev,
-      coordinates: [...(prev.coordinates || []), [latlng.lat, latlng.lng]]
-    }));
+    setCoordinates((prev) => [...prev, [latlng.lat, latlng.lng]]);
   };
 
   const handleRemovePoint = (indexToRemove: number) => {
-    setForm((prev) => ({
-      ...prev,
-      coordinates: (prev.coordinates || []).filter((_, idx) => idx !== indexToRemove)
-    }));
+    setCoordinates((prev) => prev.filter((_, idx) => idx !== indexToRemove));
   };
 
   const handleClearPoints = () => {
-    setForm((prev) => ({ ...prev, coordinates: [] }));
+    setCoordinates([]);
   };
 
   const handleAction = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -105,25 +186,40 @@ export const CityModal = ({ isOpen, onClose, initialData, onSubmit }: CityModalP
     const nameVal = formData.get('name') as string;
     const countryVal = formData.get('country') as string;
     const currencyVal = formData.get('currency') as string;
-    const timezoneVal = formData.get('timezone') as string;
+    const baseFeeVal = formData.get('base_delivery_fee') as string;
 
     if (!nameVal.trim()) return;
 
-    const points = form.coordinates || [];
-    if (points.length < 3) {
+    if (coordinates.length < 3) {
       alert('Se requieren al menos 3 puntos para delimitar un área de geocerca.');
       return;
     }
 
     setIsSaving(true);
 
+    const [lat, lng] = getCentroid(coordinates);
+    const centerLatLng = `${lat.toFixed(6)},${lng.toFixed(6)}`;
+
+    // Convert drawn points [lat, lng] to MultiPolygon coordinates [lng, lat] closed list
+    const geojsonCoords = [
+      [
+        [...coordinates.map(pt => [pt[1], pt[0]]), [coordinates[0][1], coordinates[0][0]]]
+      ]
+    ];
+
+    const geojson = {
+      type: 'MultiPolygon',
+      coordinates: geojsonCoords
+    };
+
     const payload: Partial<ICity> = {
       id: initialData?.id,
       name: nameVal,
       country: countryVal,
       currency: currencyVal,
-      timezone: timezoneVal,
-      coordinates: points,
+      base_delivery_fee: parseFloat(baseFeeVal),
+      center_lat_lng: centerLatLng,
+      coverage_area: geojson,
       is_active: initialData ? initialData.is_active : true,
     };
 
@@ -133,6 +229,8 @@ export const CityModal = ({ isOpen, onClose, initialData, onSubmit }: CityModalP
       onClose();
     }
   };
+
+  const mapCenter = coordinates.length > 0 ? coordinates[0] : [-17.9647, -67.1060];
 
   return (
     <Modal isOpen={isOpen}>
@@ -149,7 +247,7 @@ export const CityModal = ({ isOpen, onClose, initialData, onSubmit }: CityModalP
                 <h2 className="text-xl font-bold font-display tracking-tight text-foreground uppercase">
                   {initialData ? 'Editar Ciudad Operativa' : 'Nueva Ciudad'}
                 </h2>
-                <p className="text-xs text-muted-foreground">Define los límites geográficos de cobertura</p>
+                <p className="text-xs text-muted-foreground">Define los límites geográficos de cobertura con geocercas PostGIS</p>
               </div>
             </Modal.Header>
 
@@ -186,33 +284,42 @@ export const CityModal = ({ isOpen, onClose, initialData, onSubmit }: CityModalP
                       <FieldError />
                     </TextField>
 
-                    <div className="grid grid-cols-2 gap-3">
-                      <TextField
-                        isRequired
+                    <div className="flex flex-col gap-1 w-full">
+                      <label className="text-foreground text-xs font-bold uppercase tracking-wide">Moneda</label>
+                      <select
                         name="currency"
                         value={form.currency || 'BOB'}
-                        onChange={(val) => setForm(prev => ({ ...prev, currency: val }))}
-                        validate={(value) => {
-                          if (!value || value.length !== 3) return '3 caracteres';
-                          return null;
-                        }}
+                        onChange={(e) => setForm(prev => ({ ...prev, currency: e.target.value }))}
+                        className="w-full h-10 px-3 rounded-xl bg-transparent border border-divider text-foreground text-sm font-semibold hover:border-foreground/50 focus:border-foreground outline-none transition-all cursor-pointer"
                       >
-                        <Label>Moneda</Label>
-                        <Input placeholder="BOB" maxLength={3} variant="flat" />
-                        <FieldError />
-                      </TextField>
-
-                      <TextField
-                        isRequired
-                        name="timezone"
-                        value={form.timezone || 'America/La_Paz'}
-                        onChange={(val) => setForm(prev => ({ ...prev, timezone: val }))}
-                      >
-                        <Label>Timezone</Label>
-                        <Input placeholder="America/La_Paz" variant="flat" />
-                        <FieldError />
-                      </TextField>
+                        {LATAM_CURRENCIES.map(item => (
+                          <option key={item.id} value={item.id} className="bg-background text-foreground font-semibold">
+                            {item.id} - {item.label}
+                          </option>
+                        ))}
+                      </select>
                     </div>
+
+                    <TextField
+                      isRequired
+                      name="base_delivery_fee"
+                      value={form.base_delivery_fee !== undefined ? String(form.base_delivery_fee) : '10'}
+                      onChange={(val) => setForm(prev => ({ ...prev, base_delivery_fee: parseFloat(val) || 0 }))}
+                    >
+                      <Label>Tarifa Base de Envío</Label>
+                      <Input type="number" step="0.01" placeholder="Ej. 10.00" startContent={<DollarSign className="w-4 h-4 text-muted-foreground mr-1" />} variant="flat" />
+                      <FieldError />
+                    </TextField>
+
+                    <TextField
+                      name="center_lat_lng"
+                      value={form.center_lat_lng || ''}
+                      onChange={(val) => setForm(prev => ({ ...prev, center_lat_lng: val }))}
+                      isReadOnly
+                    >
+                      <Label>Centroide GPS (Autocalculado)</Label>
+                      <Input placeholder="Trazando puntos..." variant="flat" />
+                    </TextField>
                   </div>
 
                   <div className="p-3.5 rounded-2xl bg-default-50 border border-divider space-y-2">
@@ -230,8 +337,8 @@ export const CityModal = ({ isOpen, onClose, initialData, onSubmit }: CityModalP
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Editor Visual</span>
-                      <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase border ${(form.coordinates || []).length >= 3 ? 'bg-success/20 text-success border-success/30' : 'bg-warning/20 text-warning border-warning/30'}`}>
-                        {(form.coordinates || []).length} puntos trazados
+                      <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase border ${coordinates.length >= 3 ? 'bg-success/20 text-success border-success/30' : 'bg-warning/20 text-warning border-warning/30'}`}>
+                        {coordinates.length} puntos trazados
                       </span>
                     </div>
                     <div className="flex gap-2">
@@ -240,7 +347,7 @@ export const CityModal = ({ isOpen, onClose, initialData, onSubmit }: CityModalP
                         variant="flat"
                         type="button"
                         onClick={() => setIsDrawing(!isDrawing)}
-                        className={`rounded-xl text-xs font-bold px-3 ${isDrawing ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'bg-default-100 text-foreground hover:bg-default-200'}`}
+                        className={`rounded-xl text-xs font-bold px-3 cursor-pointer ${isDrawing ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'bg-default-100 text-foreground hover:bg-default-200'}`}
                       >
                         <MapPin className="w-3.5 h-3.5 mr-1" />
                         {isDrawing ? 'Dibujo: ON' : 'Activar Dibujo'}
@@ -250,7 +357,7 @@ export const CityModal = ({ isOpen, onClose, initialData, onSubmit }: CityModalP
                         variant="flat"
                         type="button"
                         onClick={handleClearPoints}
-                        className="bg-danger/20 hover:bg-danger/30 text-danger border border-danger/30 rounded-xl text-xs font-bold px-3"
+                        className="bg-danger/20 hover:bg-danger/30 text-danger border border-danger/30 rounded-xl text-xs font-bold px-3 cursor-pointer"
                       >
                         <Trash2 className="w-3.5 h-3.5 mr-1" /> Limpiar Todo
                       </Button>
@@ -259,17 +366,17 @@ export const CityModal = ({ isOpen, onClose, initialData, onSubmit }: CityModalP
 
                   <div className="h-[350px] md:h-[420px] rounded-2xl overflow-hidden border border-divider relative shadow-2xl">
                     <MapContainer
-                      center={(form.coordinates || []).length > 0 ? (form.coordinates || [])[0] : [-17.9647, -67.1060]}
+                      center={mapCenter}
                       zoom={13}
                       style={{ height: '100%', width: '100%' }}
                     >
                       <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                      <ChangeView center={(form.coordinates || []).length > 0 ? (form.coordinates || [])[0] : [-17.9647, -67.1060]} zoom={13} />
+                      <ChangeView center={mapCenter} zoom={13} />
                       <MapDrawEvents onMapClick={handleMapClick} isDrawing={isDrawing} />
 
-                      {(form.coordinates || []).length > 0 && (
+                      {coordinates.length > 0 && (
                         <Polygon
-                          positions={form.coordinates || []}
+                          positions={coordinates}
                           pathOptions={{
                             color: '#0070F0',
                             fillColor: '#0070F0',
@@ -279,7 +386,7 @@ export const CityModal = ({ isOpen, onClose, initialData, onSubmit }: CityModalP
                         />
                       )}
 
-                      {(form.coordinates || []).map((point, index) => (
+                      {coordinates.map((point, index) => (
                         <Marker
                           key={index}
                           position={point}
@@ -302,22 +409,22 @@ export const CityModal = ({ isOpen, onClose, initialData, onSubmit }: CityModalP
 
               <Modal.Footer className="p-6 bg-default-50 border-t border-divider flex items-center justify-between flex-shrink-0">
                 <p className="text-xs text-muted-foreground font-medium">
-                  * Los límites serán almacenados en formato JSON en la base de datos.
+                  * Los límites serán almacenados en formato espacial MultiPolygon (PostGIS).
                 </p>
                 <div className="flex gap-2">
                   <Button
                     variant="flat"
                     type="button"
                     onClick={onClose}
-                    className="bg-default-100 hover:bg-default-200 text-foreground rounded-xl font-bold"
+                    className="bg-default-100 hover:bg-default-200 text-foreground rounded-xl font-bold cursor-pointer"
                   >
                     <X className="w-4 h-4 mr-1.5" /> Cancelar
                   </Button>
                   <Button
                     type="submit"
                     isLoading={isSaving}
-                    disabled={!(form.coordinates && form.coordinates.length >= 3)}
-                    className="bg-primary text-white font-bold rounded-xl shadow-lg shadow-primary/25"
+                    disabled={coordinates.length < 3}
+                    className="bg-primary text-white font-bold rounded-xl shadow-lg shadow-primary/25 cursor-pointer"
                   >
                     <Save className="w-4 h-4 mr-1.5" /> Guardar Ciudad
                   </Button>

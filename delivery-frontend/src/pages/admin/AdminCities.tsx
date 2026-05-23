@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, Polygon, Popup, Marker } from 'react-leaflet';
-import { Plus, Globe, Trash2, Edit2, Info, Check, X, Shield, RefreshCw } from 'lucide-react';
+import { Plus, Globe, Trash2, Edit2, Info, RefreshCw } from 'lucide-react';
 import { Button, cn } from '@heroui/react';
 import { useCityStore } from '@/stores/cityStore';
 import { CityModal } from '@/components/modals/CityModal';
@@ -22,7 +22,6 @@ const DefaultIcon = L.icon({
 });
 L.Marker.prototype.options.icon = DefaultIcon;
 
-// Helper to assign vibrant colors dynamically to cities on the global map
 const CITY_COLORS = [
   '#0070F0', // Primary Blue
   '#17C964', // Success Green
@@ -57,32 +56,23 @@ export const AdminCities = () => {
     await saveCity(updated);
   };
 
-  // Convert postgis coordinates to Leaflet points array for rendering
-  const getLeafletPoints = (city: ICity): [number, number][] => {
-    if (city.coordinates && city.coordinates.coordinates) {
-      const coords = city.coordinates.coordinates[0];
-      return coords.slice(0, -1).map((pt: any) => [pt[1], pt[0]] as [number, number]);
-    }
-    return [];
-  };
-
   return (
-    <div className="min-h-screen bg-background pb-24 safe-top text-white">
+    <div className="min-h-screen bg-background pb-24 safe-top text-foreground">
       {/* Header */}
-      <div className="glass-card border-b border-white/10 px-6 py-6 mb-6">
+      <div className="glass-card border-b border-divider px-6 py-6 mb-6">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
             <div className="flex items-center gap-2 mb-1">
               <Globe className="w-5 h-5 text-primary" />
-              <h1 className="text-2xl font-display font-bold text-white tracking-tight">Ciudades Operativas</h1>
+              <h1 className="text-2xl font-display font-bold tracking-tight">Ciudades Operativas</h1>
             </div>
-            <p className="text-xs text-white/50 font-medium">Define y delimita áreas de cobertura con geocercas PostGIS</p>
+            <p className="text-xs text-muted-foreground font-medium">Define y delimita áreas de cobertura con geocercas JSON</p>
           </div>
           <div className="flex gap-2">
             <Button
               onClick={() => fetchCities(true)}
               variant="flat"
-              className="bg-white/5 text-white font-bold rounded-xl border border-white/10"
+              className="bg-default-100 hover:bg-default-200 text-foreground font-bold rounded-xl border border-divider"
             >
               <RefreshCw className={cn("w-4 h-4", isLoading && "animate-spin")} />
             </Button>
@@ -101,75 +91,75 @@ export const AdminCities = () => {
 
       {/* Global Interactive Map */}
       <div className="px-6 mb-8">
-        <div className="glass-card overflow-hidden border border-white/10 h-[350px] md:h-[450px] relative rounded-3xl shadow-2xl">
+        <div className="glass-card overflow-hidden border border-divider h-[350px] md:h-[450px] relative rounded-3xl shadow-2xl">
           <MapContainer
             center={[-17.9647, -67.1060]}
             zoom={6}
             style={{ height: '100%', width: '100%' }}
           >
-            <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" />
+            <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
             {cities
-              .filter(city => city.is_active)
+              .filter(city => city.is_active && Array.isArray(city.coordinates) && city.coordinates.length > 0)
               .map((city, index) => {
-                const points = getLeafletPoints(city);
                 const color = CITY_COLORS[index % CITY_COLORS.length];
                 
-                return points.length > 0 ? (
+                return (
                   <Polygon
                     key={city.id}
-                    positions={points}
+                    positions={city.coordinates}
                     pathOptions={{
                       color: color,
                       fillColor: color,
-                      fillOpacity: 0.2,
+                      fillOpacity: 0.25,
                       weight: 3,
                     }}
                   >
                     <Popup>
-                      <div className="p-2 text-black bg-white rounded-lg">
+                      <div className="p-2 text-foreground bg-background rounded-lg">
                         <p className="font-bold text-sm text-primary mb-0.5">{city.name}</p>
-                        <p className="text-[10px] text-gray-500 font-medium mb-1.5">{city.country} • {city.currency}</p>
-                        <div className="flex items-center gap-1.5 bg-gray-50 px-2 py-1 rounded">
+                        <p className="text-[10px] text-muted-foreground font-medium mb-1.5">{city.country} • {city.currency}</p>
+                        <div className="flex items-center gap-1.5 bg-default-50 px-2 py-1 rounded">
                           <span className="w-1.5 h-1.5 rounded-full bg-success" />
                           <span className="text-[9px] font-black uppercase text-success">Operativa</span>
                         </div>
                       </div>
                     </Popup>
                   </Polygon>
-                ) : null;
+                );
               })}
 
             {/* City Markers for quickly finding them on map */}
-            {cities.map((city) => (
-              <Marker 
-                key={`marker-${city.id}`} 
-                position={[city.center_lat, city.center_lng]}
-              >
-                <Popup>
-                  <div className="p-1 text-black font-semibold text-xs">
-                    {city.name} (Centro)
-                  </div>
-                </Popup>
-              </Marker>
-            ))}
+            {cities
+              .filter(city => Array.isArray(city.coordinates) && city.coordinates.length > 0)
+              .map((city) => (
+                <Marker 
+                  key={`marker-${city.id}`} 
+                  position={city.coordinates[0]}
+                >
+                  <Popup>
+                    <div className="p-1 text-foreground font-semibold text-xs">
+                      {city.name}
+                    </div>
+                  </Popup>
+                </Marker>
+              ))}
           </MapContainer>
 
           {/* Floating Indicator */}
-          <div className="absolute top-4 right-4 z-[500] bg-black/80 backdrop-blur-md px-3.5 py-2 rounded-2xl border border-white/10 flex items-center gap-2 shadow-xl">
+          <div className="absolute top-4 right-4 z-[500] bg-background/80 backdrop-blur-md px-3.5 py-2 rounded-2xl border border-divider flex items-center gap-2 shadow-xl">
             <Info className="w-3.5 h-3.5 text-primary" />
-            <span className="text-[10px] font-bold uppercase tracking-wider text-white/80">Vista Operativa Nacional</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-foreground/80">Vista Operativa Nacional</span>
           </div>
         </div>
       </div>
 
       {/* Cities Dashboard Grid */}
       <div className="px-6 space-y-4">
-        <h2 className="text-xs uppercase font-bold text-white/40 ml-1 tracking-widest">Listado de Coberturas</h2>
+        <h2 className="text-xs uppercase font-bold text-muted-foreground ml-1 tracking-widest">Listado de Coberturas</h2>
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {cities.map((city, index) => {
-            const hasGeofence = city.coordinates && city.coordinates.coordinates;
-            const pointsCount = hasGeofence ? city.coordinates.coordinates[0].length - 1 : 0;
+            const pointsCount = Array.isArray(city.coordinates) ? city.coordinates.length : 0;
             const color = CITY_COLORS[index % CITY_COLORS.length];
 
             return (
@@ -178,7 +168,7 @@ export const AdminCities = () => {
                 initial={{ opacity: 0, y: 15 }}
                 animate={{ opacity: 1, y: 0 }}
                 className={cn(
-                  "glass-card p-5 border border-white/10 hover:border-white/20 transition-all rounded-3xl relative overflow-hidden shadow-md flex flex-col justify-between h-[180px]",
+                  "glass-card p-5 border border-divider hover:border-default-300 transition-all rounded-3xl relative overflow-hidden shadow-md flex flex-col justify-between h-[180px]",
                   !city.is_active && "opacity-60"
                 )}
               >
@@ -190,8 +180,8 @@ export const AdminCities = () => {
 
                 <div className="flex items-start justify-between">
                   <div>
-                    <h3 className="font-bold text-lg text-white leading-tight">{city.name}</h3>
-                    <p className="text-xs text-white/40 font-semibold">{city.country} • Moneda: {city.currency}</p>
+                    <h3 className="font-bold text-lg leading-tight">{city.name}</h3>
+                    <p className="text-xs text-muted-foreground font-semibold">{city.country} • Moneda: {city.currency}</p>
                   </div>
                   
                   <span className={cn(
@@ -204,16 +194,16 @@ export const AdminCities = () => {
                   </span>
                 </div>
 
-                <div className="flex items-center gap-4 py-2 border-t border-b border-white/5 my-2">
+                <div className="flex items-center gap-4 py-2 border-t border-b border-divider my-2">
                   <div className="flex-1">
-                    <p className="text-[10px] text-white/40 font-bold uppercase tracking-wider">Geocerca</p>
-                    <p className="text-xs font-semibold text-white/80">
-                      {pointsCount > 0 ? `${pointsCount} vértices trazados` : 'Sin geocerca'}
+                    <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Geocerca</p>
+                    <p className="text-xs font-semibold text-foreground/80">
+                      {pointsCount > 0 ? `${pointsCount} puntos trazados` : 'Sin geocerca'}
                     </p>
                   </div>
                   <div className="flex-1">
-                    <p className="text-[10px] text-white/40 font-bold uppercase tracking-wider">Huso Horario</p>
-                    <p className="text-xs font-semibold text-white/80 truncate">{city.timezone}</p>
+                    <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Huso Horario</p>
+                    <p className="text-xs font-semibold text-foreground/80 truncate">{city.timezone}</p>
                   </div>
                 </div>
 
@@ -236,7 +226,7 @@ export const AdminCities = () => {
                     size="sm"
                     variant="flat"
                     onClick={() => handleEdit(city)}
-                    className="bg-white/5 hover:bg-white/10 text-white rounded-xl text-[10px] font-black uppercase h-8 px-4 flex-1 border border-white/10"
+                    className="bg-default-100 hover:bg-default-200 text-foreground rounded-xl text-[10px] font-black uppercase h-8 px-4 flex-1 border border-divider"
                   >
                     <Edit2 className="w-3 h-3 mr-1 text-primary" /> Editar
                   </Button>
@@ -247,9 +237,9 @@ export const AdminCities = () => {
         </div>
 
         {cities.length === 0 && !isLoading && (
-          <div className="text-center py-20 glass-card bg-white/5 border border-dashed border-white/15 rounded-3xl">
-            <Globe className="w-14 h-14 mx-auto mb-4 text-white/15 animate-pulse" />
-            <p className="text-sm text-white/60 font-semibold">No hay ciudades configuradas en el sistema</p>
+          <div className="text-center py-20 glass-card bg-default-50 border border-dashed border-divider rounded-3xl">
+            <Globe className="w-14 h-14 mx-auto mb-4 text-default-300 animate-pulse" />
+            <p className="text-sm text-muted-foreground font-semibold">No hay ciudades configuradas en el sistema</p>
           </div>
         )}
       </div>

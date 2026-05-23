@@ -55,9 +55,7 @@ model City {
   currency    String   @default("BOB") @db.VarChar(3)
   timezone    String   @default("America/La_Paz")
   is_active   Boolean  @default(true)
-  center_lat  Float    @default(-17.9647)
-  center_lng  Float    @default(-67.1060)
-  coordinates Unsupported("geometry(Geometry, 4326)")?
+  coordinates Json     // Array de puntos [[lat, lng], [lat, lng]...]
   created_at  DateTime @default(now())
   updated_at  DateTime @updatedAt
 

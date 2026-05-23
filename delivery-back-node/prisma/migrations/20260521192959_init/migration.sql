@@ -24,9 +24,7 @@ CREATE TABLE "cities" (
     "currency" VARCHAR(3) NOT NULL DEFAULT 'BOB',
     "timezone" TEXT NOT NULL DEFAULT 'America/La_Paz',
     "is_active" BOOLEAN NOT NULL DEFAULT true,
-    "center_lat" DOUBLE PRECISION NOT NULL DEFAULT -17.9647,
-    "center_lng" DOUBLE PRECISION NOT NULL DEFAULT -67.1060,
-    "coordinates" geometry(Geometry, 4326),
+    "coordinates" JSONB NOT NULL,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
 
@@ -190,9 +188,6 @@ CREATE TABLE "app_policies" (
 
 -- CreateIndex
 CREATE UNIQUE INDEX "cities_name_key" ON "cities"("name");
-
--- CreateIndex
-CREATE INDEX "cities_coordinates_idx" ON "cities" USING GIST ("coordinates");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "users_email_key" ON "users"("email");

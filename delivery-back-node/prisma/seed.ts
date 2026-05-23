@@ -4,16 +4,16 @@ import bcrypt from 'bcryptjs';
 const prisma = new PrismaClient();
 
 const CITIES = [
-  { name: 'Oruro',       country: 'Bolivia', currency: 'BOB', timezone: 'America/La_Paz', center_lat: -17.9647, center_lng: -67.1060 },
-  { name: 'La Paz',      country: 'Bolivia', currency: 'BOB', timezone: 'America/La_Paz', center_lat: -16.4897, center_lng: -68.1193 },
-  { name: 'Cochabamba',  country: 'Bolivia', currency: 'BOB', timezone: 'America/La_Paz', center_lat: -17.3895, center_lng: -66.1568 },
-  { name: 'Santa Cruz',  country: 'Bolivia', currency: 'BOB', timezone: 'America/La_Paz', center_lat: -17.7834, center_lng: -63.1821 },
-  { name: 'Potosí',      country: 'Bolivia', currency: 'BOB', timezone: 'America/La_Paz', center_lat: -19.5723, center_lng: -65.7550 },
-  { name: 'Sucre',       country: 'Bolivia', currency: 'BOB', timezone: 'America/La_Paz', center_lat: -19.0196, center_lng: -65.2619 },
-  { name: 'Tarija',      country: 'Bolivia', currency: 'BOB', timezone: 'America/La_Paz', center_lat: -21.5353, center_lng: -64.7296 },
-  { name: 'Trinidad',    country: 'Bolivia', currency: 'BOB', timezone: 'America/La_Paz', center_lat: -14.8348, center_lng: -64.9043 },
-  { name: 'Beni',        country: 'Bolivia', currency: 'BOB', timezone: 'America/La_Paz', center_lat: -14.2785, center_lng: -65.2783 },
-  { name: 'Cobija',      country: 'Bolivia', currency: 'BOB', timezone: 'America/La_Paz', center_lat: -11.0298, center_lng: -68.7695 },
+  { name: 'Oruro',       country: 'Bolivia', currency: 'BOB', timezone: 'America/La_Paz', coordinates: [] },
+  { name: 'La Paz',      country: 'Bolivia', currency: 'BOB', timezone: 'America/La_Paz', coordinates: [] },
+  { name: 'Cochabamba',  country: 'Bolivia', currency: 'BOB', timezone: 'America/La_Paz', coordinates: [] },
+  { name: 'Santa Cruz',  country: 'Bolivia', currency: 'BOB', timezone: 'America/La_Paz', coordinates: [] },
+  { name: 'Potosí',      country: 'Bolivia', currency: 'BOB', timezone: 'America/La_Paz', coordinates: [] },
+  { name: 'Sucre',       country: 'Bolivia', currency: 'BOB', timezone: 'America/La_Paz', coordinates: [] },
+  { name: 'Tarija',      country: 'Bolivia', currency: 'BOB', timezone: 'America/La_Paz', coordinates: [] },
+  { name: 'Trinidad',    country: 'Bolivia', currency: 'BOB', timezone: 'America/La_Paz', coordinates: [] },
+  { name: 'Beni',        country: 'Bolivia', currency: 'BOB', timezone: 'America/La_Paz', coordinates: [] },
+  { name: 'Cobija',      country: 'Bolivia', currency: 'BOB', timezone: 'America/La_Paz', coordinates: [] },
 ];
 
 async function main() {

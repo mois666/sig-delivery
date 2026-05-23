@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useAuthStore } from '@/stores/authStore';
 import { appDB } from '@/api/appDB';
 import { Loader2 } from 'lucide-react';
+import { logger } from '@/lib/logger';
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const { setAuth, logout, isAuthenticated } = useAuthStore();
@@ -17,7 +18,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setAuth(data.user, data.accessToken);
       } catch (error) {
         // Si falla (cookie expirada o inexistente), limpiamos el estado
-        console.log("Sesión no recuperable");
+        logger.warning("Sesión no recuperable");
         logout();
       } finally {
         setIsVerifying(false);

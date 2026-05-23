@@ -6,36 +6,36 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
 interface UserModalProps {
-  isOpen:    boolean;
-  onClose:   () => void;
-  onSubmit:  (data: any) => void;
-  user?:     IUser | null;
+  isOpen: boolean;
+  onClose: () => void;
+  onSubmit: (data: any) => void;
+  user?: IUser | null;
 }
 
 const STATUS_OPTIONS = [
-  { id: 'active',    label: 'Activo'      },
-  { id: 'inactive',  label: 'Inactivo'    },
-  { id: 'suspended', label: 'Suspendido'  },
+  { id: 'active', label: 'Activo' },
+  { id: 'inactive', label: 'Inactivo' },
+  { id: 'suspended', label: 'Suspendido' },
 ];
 
 const ROLE_OPTIONS = [
-  { id: 'admin',  label: 'Administrador' },
-  { id: 'driver', label: 'Repartidor'    },
-  { id: 'client', label: 'Cliente'       },
+  { id: 'admin', label: 'Administrador' },
+  { id: 'driver', label: 'Repartidor' },
+  { id: 'client', label: 'Cliente' },
 ];
 
 const TRANSPORT_OPTIONS = [
-  { id: 'on_foot',    label: '🚶 A Pie'       },
-  { id: 'bike',       label: '🚲 Bicicleta'   },
-  { id: 'motorcycle', label: '🏍️ Moto'        },
-  { id: 'car',        label: '🚗 Automóvil'   },
+  { id: 'on_foot', label: '🚶 A Pie' },
+  { id: 'bike', label: '🚲 Bicicleta' },
+  { id: 'motorcycle', label: '🏍️ Moto' },
+  { id: 'car', label: '🚗 Automóvil' },
 ];
 
 const COUNTRY_CODES = [
   { id: '+591', label: '🇧🇴 +591' },
-  { id: '+54',  label: '🇦🇷 +54'  },
-  { id: '+56',  label: '🇨🇱 +56'  },
-  { id: '+51',  label: '🇵🇪 +51'  },
+  { id: '+54', label: '🇦🇷 +54' },
+  { id: '+56', label: '🇨🇱 +56' },
+  { id: '+51', label: '🇵🇪 +51' },
 ];
 
 /** Extrae el primer valor de cualquier tipo de selección de HeroUI de forma segura */
@@ -61,9 +61,9 @@ export const UserModal = ({ isOpen, onClose, onSubmit, user }: UserModalProps) =
   const [isLoading, setIsLoading] = useState(false);
 
   const [form, setForm] = useState({
-    countryCode:    new Set(['+591']),
-    status:         new Set(['active'])     as any,
-    role:           new Set(['driver'])     as any,
+    countryCode: new Set(['+591']),
+    status: new Set(['active']) as any,
+    role: new Set(['driver']) as any,
     transport_type: new Set(['motorcycle']) as any,
   });
 
@@ -71,16 +71,16 @@ export const UserModal = ({ isOpen, onClose, onSubmit, user }: UserModalProps) =
   useEffect(() => {
     if (user) {
       setForm({
-        countryCode:    new Set(['+591']),
-        status:         new Set([user.status]),
-        role:           new Set([user.role || 'driver']),
+        countryCode: new Set(['+591']),
+        status: new Set([user.status]),
+        role: new Set([user.role || 'driver']),
         transport_type: new Set([user.transport_type || 'motorcycle']),
       });
     } else {
       setForm({
-        countryCode:    new Set(['+591']),
-        status:         new Set(['active']),
-        role:           new Set(['driver']),
+        countryCode: new Set(['+591']),
+        status: new Set(['active']),
+        role: new Set(['driver']),
         transport_type: new Set(['motorcycle']),
       });
     }
@@ -123,13 +123,13 @@ export const UserModal = ({ isOpen, onClose, onSubmit, user }: UserModalProps) =
     }
 
     const payload = {
-      name:           data.name,
-      email:          data.email,
-      pin:            data.pin || undefined,
-      role:           getValueFromSelection(form.role),
+      name: data.name,
+      email: data.email,
+      pin: data.pin || undefined,
+      role: getValueFromSelection(form.role),
       transport_type: getValueFromSelection(form.transport_type),
-      status:         getValueFromSelection(form.status),
-      phone:          `${getValueFromSelection(form.countryCode)}${data.phone}`,
+      status: getValueFromSelection(form.status),
+      phone: `${getValueFromSelection(form.countryCode)}${data.phone}`,
     };
 
     onSubmit(payload);
@@ -143,11 +143,11 @@ export const UserModal = ({ isOpen, onClose, onSubmit, user }: UserModalProps) =
           <Modal.Dialog className="w-full max-w-lg bg-background border border-divider rounded-[24px] overflow-hidden flex flex-col">
             <Modal.CloseTrigger onPress={onClose} className="top-4 right-4 text-muted-foreground hover:text-foreground" />
 
-            <Modal.Header className="p-6 border-b border-divider flex items-center gap-4">
-              <Modal.Icon className="bg-primary/20 text-primary rounded-xl p-2.5">
+            <Modal.Header className="border-b border-divider flex flex-row items-center gap-4">
+              <Modal.Icon className="rounded-xl p-2.5">
                 {user ? <Edit3 className="w-5 h-5" /> : <UserPlus className="w-5 h-5" />}
               </Modal.Icon>
-              <Modal.Heading className="text-xl font-black text-white uppercase tracking-tight">
+              <Modal.Heading className="text-xl font-black uppercase tracking-tight">
                 {user ? 'Editar Usuario' : 'Nuevo Usuario'}
               </Modal.Heading>
             </Modal.Header>
@@ -311,8 +311,8 @@ export const UserModal = ({ isOpen, onClose, onSubmit, user }: UserModalProps) =
                             <ListBox.Item
                               key={item.id} id={item.id} textValue={item.label}
                               className={cn('rounded-xl m-1 hover:bg-primary/10 transition-colors',
-                                item.id === 'active'    ? 'text-success' :
-                                item.id === 'suspended' ? 'text-danger'  : 'text-foreground'
+                                item.id === 'active' ? 'text-success' :
+                                  item.id === 'suspended' ? 'text-danger' : 'text-foreground'
                               )}
                             >
                               {item.label}

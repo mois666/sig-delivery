@@ -1,6 +1,7 @@
 // geoUtils.ts
 import { appDB } from "@/api/appDB"; // Importamos la instancia de conexión al backend
 import axios from "axios";
+import { logger } from "@/lib/logger";
 
 /**
  * Calcula la distancia entre dos puntos geográficos usando la fórmula de Haversine.
@@ -92,7 +93,7 @@ export const getExtraRateFromBackend = async (lat: number, lng: number): Promise
         return data.extra_rate || 0;
     } catch (error) {
         if (axios.isAxiosError(error)) {
-            console.error(error.response?.data);
+            logger.error("Error al verificar tarifa de la zona:", error.response?.data);
         }
         return 0; // Fallback seguro
     }
@@ -128,7 +129,7 @@ export const getAddressFromCoords = async (coords: string): Promise<string> => {
         return result.formatted || "Dirección no encontrada";
 
     } catch (error) {
-        console.error("Geocoding error:", error);
+        logger.error("Error en geocodificación:", error);
         return "Error al obtener dirección";
     }
 };

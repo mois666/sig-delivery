@@ -96,15 +96,15 @@ export class CityController {
     }
   }
 
-  /** DELETE /cities/:id — solo admin/super_admin (soft delete) */
+  /** DELETE /cities/:id — solo admin/super_admin (hard delete) */
   static async destroy(req: Request, res: Response) {
     const id = parseInt(req.params.id as string);
     try {
-      await prisma.city.update({ where: { id }, data: { is_active: false } });
-      return res.json({ message: 'Ciudad desactivada' });
+      await prisma.city.delete({ where: { id } });
+      return res.json({ message: 'Ciudad eliminada permanentemente' });
     } catch (error) {
       console.error('Error en destroy:', error);
-      return res.status(500).json({ message: 'Error al eliminar ciudad' });
+      return res.status(500).json({ message: 'Error al eliminar ciudad físicamente' });
     }
   }
 }

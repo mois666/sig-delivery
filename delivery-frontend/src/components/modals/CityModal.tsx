@@ -163,7 +163,8 @@ export const CityModal = ({ isOpen, onClose, initialData, onSubmit }: CityModalP
                     <TextField
                       isRequired
                       name="name"
-                      defaultValue={form.name || ''}
+                      value={form.name || ''}
+                      onChange={(val) => setForm(prev => ({ ...prev, name: val }))}
                       validate={(value) => {
                         if (!value || value.length < 3) return 'Mínimo 3 caracteres';
                         return null;
@@ -177,7 +178,8 @@ export const CityModal = ({ isOpen, onClose, initialData, onSubmit }: CityModalP
                     <TextField
                       isRequired
                       name="country"
-                      defaultValue={form.country || 'Bolivia'}
+                      value={form.country || 'Bolivia'}
+                      onChange={(val) => setForm(prev => ({ ...prev, country: val }))}
                     >
                       <Label>País</Label>
                       <Input placeholder="Ej. Bolivia" variant="flat" />
@@ -188,7 +190,8 @@ export const CityModal = ({ isOpen, onClose, initialData, onSubmit }: CityModalP
                       <TextField
                         isRequired
                         name="currency"
-                        defaultValue={form.currency || 'BOB'}
+                        value={form.currency || 'BOB'}
+                        onChange={(val) => setForm(prev => ({ ...prev, currency: val }))}
                         validate={(value) => {
                           if (!value || value.length !== 3) return '3 caracteres';
                           return null;
@@ -202,7 +205,8 @@ export const CityModal = ({ isOpen, onClose, initialData, onSubmit }: CityModalP
                       <TextField
                         isRequired
                         name="timezone"
-                        defaultValue={form.timezone || 'America/La_Paz'}
+                        value={form.timezone || 'America/La_Paz'}
+                        onChange={(val) => setForm(prev => ({ ...prev, timezone: val }))}
                       >
                         <Label>Timezone</Label>
                         <Input placeholder="America/La_Paz" variant="flat" />

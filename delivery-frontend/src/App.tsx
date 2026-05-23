@@ -19,6 +19,7 @@ import { useSocketStore } from "./stores/socketStore";
 import { useEffect } from "react";
 import AdminUsers from "./pages/admin/AdminUsers";
 import { AdminShowUser } from "./pages/admin/AdminShowUser";
+import { Toaster } from "sonner";
 
 const queryClient = new QueryClient();
 
@@ -113,13 +114,15 @@ const AppRoutes = () => (
   </MainLayout>
 );
 // Componente para gestionar la conexión global
+import { logger } from "@/lib/logger";
+
 const SocketManager = () => {
   const { isAuthenticated } = useAuthStore();
   const { initConnectionListener } = useSocketStore();
 
   useEffect(() => {
     if (isAuthenticated) {
-      console.log("🚀 Usuario autenticado, activando listeners de Reverb...");
+      logger.success("Usuario autenticado, activando conexiones de socket...");
       initConnectionListener();
     }
   }, [isAuthenticated, initConnectionListener]);
@@ -133,6 +136,7 @@ const App = () => (
       <AuthProvider>
         <SocketManager />
         <AppRoutes />
+        <Toaster richColors position="top-right" />
       </AuthProvider>
     </ThemeProvider>
   </QueryClientProvider>

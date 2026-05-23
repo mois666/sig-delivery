@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, Polygon, Popup, Marker } from 'react-leaflet';
-import { Plus, Globe, Trash2, Edit2, Info, RefreshCw } from 'lucide-react';
-import { Button, cn } from '@heroui/react';
+import { Plus, Globe, Trash2, Edit2, Info, RefreshCw, X } from 'lucide-react';
+import { Button, cn, Modal } from '@heroui/react';
 import { useCityStore } from '@/stores/cityStore';
 import { CityModal } from '@/components/modals/CityModal';
 import { ICity } from '@/interfaces/city-interface';
@@ -37,6 +37,9 @@ export const AdminCities = () => {
   const { cities, fetchCities, saveCity, deleteCity, isLoading } = useCityStore();
   const [showModal, setShowModal] = useState(false);
   const [selectedCity, setSelectedCity] = useState<ICity | null>(null);
+  
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [cityToDelete, setCityToDelete] = useState<ICity | null>(null);
 
   useEffect(() => {
     // Fetch all cities including inactive ones
@@ -54,6 +57,21 @@ export const AdminCities = () => {
       is_active: !city.is_active,
     };
     await saveCity(updated);
+  };
+
+  const handleDeleteClick = (city: ICity) => {
+    setCityToDelete(city);
+    setShowDeleteConfirm(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (cityToDelete) {
+      const success = await deleteCity(cityToDelete.id);
+      if (success) {
+        setShowDeleteConfirm(false);
+        setCityToDelete(null);
+      }
+    }
   };
 
   return (
@@ -178,7 +196,20 @@ export const AdminCities = () => {
                   style={{ backgroundColor: city.is_active ? color : '#3F3F46' }}
                 />
 
-                <div className="flex items-start justify-between">
+                 {/* Delete button (X) in top-right */}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDeleteClick(city);
+                  }}
+                  className="absolute top-3 right-3 z-10 p-1 rounded-full bg-default-50 hover:bg-danger/10 hover:text-danger text-muted-foreground transition-colors border border-divider flex items-center justify-center cursor-pointer shadow-sm"
+                  title="Eliminar ciudad"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+
+                <div className="flex items-start justify-between pr-8">
                   <div>
                     <h3 className="font-bold text-lg leading-tight">{city.name}</h3>
                     <p className="text-xs text-muted-foreground font-semibold">{city.country} • Moneda: {city.currency}</p>
@@ -253,6 +284,49 @@ export const AdminCities = () => {
             initialData={selectedCity}
             onSubmit={saveCity}
           />
+        )}
+      </AnimatePresence>
+
+      {/* Confirmation Modal for Delete */}
+      <AnimatePresence>
+        {showDeleteConfirm && cityToDelete && (
+          <Modal isOpen={showDeleteConfirm}>
+            <Modal.Backdrop className="bg-black/80 backdrop-blur-sm">
+              <Modal.Container>
+                <Modal.Dialog className="w-full max-w-md bg-background border border-divider rounded-[24px] overflow-hidden flex flex-col text-foreground p-6">
+                  <Modal.CloseTrigger onPress={() => setShowDeleteConfirm(false)} className="top-4 right-4 text-muted-foreground hover:text-foreground" />
+                  
+                  <div className="flex flex-col items-center text-center space-y-4 py-4">
+                    <div className="w-12 h-12 rounded-full bg-danger/10 flex items-center justify-center border border-danger/20 text-danger">
+                      <Trash2 className="w-6 h-6" />
+                    </div>
+                    <div className="space-y-1">
+                      <h2 className="text-xl font-bold uppercase tracking-tight text-foreground">¿Eliminar Ciudad?</h2>
+                      <p className="text-sm text-muted-foreground font-medium mt-2">
+                        ¿Estás seguro de que deseas eliminar la ciudad de <span className="font-bold text-foreground">"{cityToDelete.name}"</span>? Esta acción desactivará la cobertura.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3 mt-6">
+                    <Button
+                      variant="flat"
+                      onClick={() => setShowDeleteConfirm(false)}
+                      className="bg-default-100 hover:bg-default-200 text-foreground rounded-xl font-bold flex-1 h-12 border border-divider"
+                    >
+                      Cancelar
+                    </Button>
+                    <Button
+                      onClick={handleConfirmDelete}
+                      className="bg-danger text-white font-bold rounded-xl shadow-lg shadow-danger/20 flex-1 h-12"
+                    >
+                      Eliminar
+                    </Button>
+                  </div>
+                </Modal.Dialog>
+              </Modal.Container>
+            </Modal.Backdrop>
+          </Modal>
         )}
       </AnimatePresence>
     </div>

@@ -61,14 +61,14 @@ export const useCityStore = create<CityState>((set, get) => ({
     try {
       const { data } = await appDB.delete<{ message: string }>(`/cities/${id}`);
       set((state) => ({
-        cities: state.cities.map((c) => (c.id === id ? { ...c, is_active: false } : c)),
+        cities: state.cities.filter((c) => c.id !== id),
         isLoading: false,
       }));
-      toast.success(data.message || 'Ciudad desactivada');
+      toast.success(data.message || 'Ciudad eliminada permanentemente');
       return true;
     } catch (error: any) {
       set({ isLoading: false });
-      const msg = error.response?.data?.message || 'Error al desactivar la ciudad';
+      const msg = error.response?.data?.message || 'Error al eliminar la ciudad';
       toast.error(msg);
       return false;
     }

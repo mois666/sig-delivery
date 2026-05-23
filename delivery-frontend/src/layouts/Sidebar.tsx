@@ -4,7 +4,8 @@ import { useAuthStore } from "@/stores/authStore";
 import {
   LayoutDashboard, Package, Map, ClipboardList,
   Home, Rocket, Wallet, Trophy, LogOut,
-  Settings, ChevronRight, Users, Globe
+  Settings, ChevronRight, Users, Globe,
+  Bike
 } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -34,10 +35,10 @@ export const Sidebar = () => {
       <div className="p-8 pb-10">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center shadow-lg shadow-primary/20">
-            <Rocket className="w-6 h-6" />
+            <Bike className="w-6 h-6" />
           </div>
           <h1 className="text-xl font-black font-display text-foreground tracking-tighter leading-none">
-            DRIVE<span className="text-primary">CORE</span>
+            {import.meta.env.VITE_NAME_APP || 'Depedidos'}
           </h1>
         </div>
       </div>

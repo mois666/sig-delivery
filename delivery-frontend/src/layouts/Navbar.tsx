@@ -3,7 +3,7 @@
 import { Avatar, Dropdown, Button, Description, Header, Kbd, Label, Separator, Badge } from "@heroui/react";
 import { useAuthStore } from "@/stores/authStore";
 import { useSocketStore } from "@/stores/socketStore";
-import { Bell, Search, Settings, LogOut, User, Rocket, Menu, Sun, Moon } from "lucide-react";
+import { Bell, Search, Settings, LogOut, User, Bike, Menu, Sun, Moon } from "lucide-react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { useTheme } from "next-themes";
@@ -16,20 +16,20 @@ export const TopNavbar = () => {
   return (
     <header className="sticky top-0 z-[40] w-full h-16 bg-background/80 backdrop-blur-md border-b border-divider transition-all duration-300">
       <div className="h-full max-w-[1920px] mx-auto px-4 md:px-6 flex items-center justify-between gap-4">
-        
+
         {/* Left Section: Logo & Search */}
         <div className="flex items-center gap-4 md:gap-8 flex-1">
           <div className="flex items-center gap-2 cursor-pointer">
             <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-              <Rocket className="w-5 h-5 text-white" />
+              <Bike className="w-5 h-5" />
             </div>
             <div className="hidden sm:flex flex-col leading-none">
               <span className="text-lg font-black font-display text-foreground tracking-tighter uppercase">
-                {isAuthenticated && user?.city?.name ? user.city.name : 'DRIVECORE'}
+                {isAuthenticated && user?.city?.name ? user.city.name : (import.meta.env.VITE_NAME_APP || 'Depedidos')}
               </span>
               {isAuthenticated && user?.city?.name && (
                 <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">
-                  DRIVECORE
+                  {import.meta.env.VITE_NAME_APP || 'Depedidos'}
                 </span>
               )}
             </div>
@@ -37,9 +37,9 @@ export const TopNavbar = () => {
 
           <div className="hidden md:flex items-center relative max-w-sm w-full group">
             <Search className="absolute left-3 w-4 h-4 text-muted-foreground" />
-            <input 
-              type="text" 
-              placeholder="Buscar..." 
+            <input
+              type="text"
+              placeholder="Buscar..."
               className={cn(
                 "w-full h-9 pl-9 pr-4 bg-default-100 border-none rounded-xl text-sm outline-none transition-all",
                 "focus:bg-default-200"
@@ -50,7 +50,7 @@ export const TopNavbar = () => {
 
         {/* Right Section: Actions */}
         <div className="flex items-center gap-2 md:gap-4">
-          
+
           {/* Theme Switcher */}
           <Button
             isIconOnly
@@ -62,8 +62,8 @@ export const TopNavbar = () => {
           </Button>
 
           <Badge.Anchor>
-            <Button 
-              isIconOnly 
+            <Button
+              isIconOnly
               variant="light"
               className="text-muted-foreground"
             >
@@ -83,11 +83,11 @@ export const TopNavbar = () => {
                     <User className="w-4 h-4" />
                   </Avatar.Fallback>
                 </Avatar>
-                <span 
+                <span
                   className={cn(
                     "absolute right-0 bottom-0 size-2.5 rounded-full ring-2 ring-background",
                     isConnected ? "bg-green-500" : "bg-red-500"
-                  )} 
+                  )}
                 />
               </div>
               <div className="hidden sm:flex flex-col items-start mr-2">
@@ -109,9 +109,9 @@ export const TopNavbar = () => {
                     </div>
                   </Dropdown.Item>
                 </Dropdown.Section>
-                
+
                 <Separator className="bg-divider my-2" />
-                
+
                 <Dropdown.Section>
                   <Dropdown.Item id="profile" textValue="Perfil" href="/profile">
                     <div className="flex items-center gap-2">
@@ -130,9 +130,9 @@ export const TopNavbar = () => {
                 <Separator className="bg-divider my-2" />
 
                 <Dropdown.Section>
-                  <Dropdown.Item 
-                    id="logout" 
-                    textValue="Salir" 
+                  <Dropdown.Item
+                    id="logout"
+                    textValue="Salir"
                     variant="danger"
                     onPress={logout}
                     className="text-danger"

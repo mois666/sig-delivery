@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { socket } from '@/lib/socket';
+import { logger } from '@/lib/logger';
 
 interface SocketState {
   isConnected: boolean;
@@ -17,12 +18,12 @@ export const useSocketStore = create<SocketState>((set) => ({
     // 2. Vincular eventos para cambios futuros
     socket.on('connect', () => {
       set({ isConnected: true });
-      console.log('[Socket] Conectado exitosamente');
+      logger.success('[Socket] Conectado exitosamente');
     });
 
     socket.on('disconnect', () => {
       set({ isConnected: false });
-      console.log('[Socket] Desconectado');
+      logger.warning('[Socket] Desconectado');
     });
   },
 

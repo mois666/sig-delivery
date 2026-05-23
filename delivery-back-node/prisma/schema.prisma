@@ -53,11 +53,12 @@ model City {
   name        String   @unique
   country     String   @default("Bolivia")
   currency    String   @default("BOB") @db.VarChar(3)
-  timezone    String   @default("America/La_Paz")
   is_active   Boolean  @default(true)
-  coordinates Json     // Array de puntos [[lat, lng], [lat, lng]...]
-  created_at  DateTime @default(now())
-  updated_at  DateTime @updatedAt
+  base_delivery_fee Decimal  @db.Decimal(10, 2)
+  center_lat_lng     String?
+  coverage_area     Unsupported("geometry(MultiPolygon, 4326)")
+  created_at        DateTime @default(now())
+  updated_at        DateTime         @updatedAt
 
   orders Order[]
 
@@ -107,6 +108,7 @@ model Order {
   pickup       String            // Dirección de recogida
   delivery     String            // Dirección de entrega
   address      String?           @db.Text
+  address_metadata   Json?
   delivery_fee Decimal           @db.Decimal(10, 2)
   urgency      Urgency           @default(baja)
   description  String?           @db.Text
@@ -177,12 +179,14 @@ model Transaction {
 model Zone {
   id          Int      @id @default(autoincrement())
   name        String
-  coordinates Json     // Array de puntos [[lat, lng], [lat, lng]...]
   extra_rate  Decimal  @default(0) @db.Decimal(8, 2)
   color       String   @default("#ff0000")
   is_active   Boolean  @default(true)
+  polygon     Unsupported("geometry(Polygon, 4326)")
+  city_id     Int
   created_at  DateTime @default(now())
   updated_at  DateTime @updatedAt
+  city        City     @relation(fields: [city_id], references: [id])
 
   @@map("zones")
 }

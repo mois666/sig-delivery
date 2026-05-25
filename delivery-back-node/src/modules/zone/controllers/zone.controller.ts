@@ -195,7 +195,12 @@ export class ZoneController {
   }
 
   static async checkRate(req: Request, res: Response) {
-    const { lat, lng } = req.query as any;
+    const lat = parseFloat(req.query.lat as string);
+    const lng = parseFloat(req.query.lng as string);
+
+    if (isNaN(lat) || isNaN(lng)) {
+      return res.status(400).json({ message: 'Coordenadas inválidas' });
+    }
 
     try {
       const extraRate = await GeoService.calculateExtraRate(lat, lng);

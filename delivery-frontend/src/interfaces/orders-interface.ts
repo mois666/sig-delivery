@@ -1,7 +1,6 @@
-import { Calendar, Package, Zap } from "lucide-react";
+import { Calendar, Package } from "lucide-react";
 
-
-export type OrderType = 'express' | 'estandar' | 'programada';
+export type OrderType = 'estandar' | 'programada';
 export type OrderStatus = 'available' | 'accepted' | 'on_the_way' | 'delivered' | 'cancelled';
 export interface IOrder {
     id: string;
@@ -14,7 +13,10 @@ export interface IOrder {
     pickupAddress: string;
     deliveryAddress: string;
     customerName: string;
-    urgency: 'low' | 'medium' | 'high';
+    delivery_time: string;
+    address_a?: string | null;
+    address_b?: string | null;
+    address_metadata?: any;
     expiresAt: Date;
     status: OrderStatus;
     assignedTo?: string;
@@ -22,22 +24,22 @@ export interface IOrder {
     acceptedAt?: Date;
     completedAt?: Date;
 }
-export type IOrderType = 'express' | 'estandar' | 'programada';
+export type IOrderType = 'estandar' | 'programada';
 export const orderTypeConfig: Record<IOrderType, { icon: any; label: string; color: string }> = {
-    express: { icon: Zap, label: 'Express', color: 'text-warning' },
     estandar: { icon: Package, label: 'Estándar', color: 'text-success' },
     programada: { icon: Calendar, label: 'Programada', color: 'text-primary' },
 };
 export interface IAddOrder {
     id: string;
-    type: 'estandar' | 'express' | 'programada';
+    type: 'estandar' | 'programada';
     client_name: string;
     description: string;
     pickup: string;            // Dirección de recogida
     delivery: string;          // Dirección de entrega
-    address: string; // Detalles extra
+    address_a?: string | null; // Punto de recogida dirección manual
+    address_b?: string | null; // Punto de entrega dirección manual
+    delivery_time: string;
     delivery_fee: number;
-    urgency: 'baja' | 'media' | 'alta';
     currency: string;
     status: string;
     duration: string;

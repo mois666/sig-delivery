@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Zap, Clock, MapPin, Loader2, Rocket, Package, Map as MapIcon, Save, X } from 'lucide-react';
+import { Zap, Clock, MapPin, Loader2, Rocket, Package, Map as MapIcon, Save, X, Calendar } from 'lucide-react';
 import {
   Button,
   Description,
@@ -14,13 +14,12 @@ import {
   TextField,
 } from '@heroui/react';
 import { useOrderStore } from '@/stores/orderStore';
+import { useAuthStore } from '@/stores/authStore';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { calculateDistance, extractCoords, getAddressFromCoords, getExtraRateFromBackend } from '@/lib/geoUtils';
 import { MapPicker } from '../maps/MapPicker';
 import { appDB } from '@/api/appDB';
-
-const GLOBAL_RATE = 5;
 
 // ─── Tipo de Servicio ────────────────────────────────────────────────────────
 const SERVICE_TYPES = [
@@ -36,20 +35,9 @@ const SERVICE_TYPES = [
     points: 10,
   },
   {
-    id: 'express',
-    label: 'Express',
-    icon: Zap,
-    description: 'Máxima velocidad',
-    color: 'from-danger/20 to-danger/10',
-    borderActive: 'border-danger',
-    textActive: 'text-danger',
-    iconBg: 'bg-danger/20',
-    points: 20,
-  },
-  {
     id: 'programada',
     label: 'Programada',
-    icon: Clock,
+    icon: Calendar,
     description: 'Hora acordada',
     color: 'from-purple-500/20 to-purple-600/10',
     borderActive: 'border-purple-500',
@@ -59,63 +47,45 @@ const SERVICE_TYPES = [
   },
 ] as const;
 
-// ─── Urgencia ────────────────────────────────────────────────────────────────
-const URGENCY_OPTIONS = [
-  {
-    id: 'baja',
-    label: 'Baja',
-    icon: '🟢',
-    description: 'Sin apuro',
-    color: 'from-green-500/20 to-emerald-500/10',
-    borderActive: 'border-green-500',
-    textActive: 'text-green-400',
-    badge: 'bg-green-500/20 text-green-400',
-  },
-  {
-    id: 'media',
-    label: 'Media',
-    icon: '🟡',
-    description: 'Normal',
-    color: 'from-yellow-500/20 to-amber-500/10',
-    borderActive: 'border-yellow-500',
-    textActive: 'text-yellow-400',
-    badge: 'bg-yellow-500/20 text-yellow-400',
-  },
-  {
-    id: 'alta',
-    label: 'Alta',
-    icon: '🔴',
-    description: '¡Urgente!',
-    color: 'from-red-500/20 to-rose-500/10',
-    borderActive: 'border-red-500',
-    textActive: 'text-red-400',
-    badge: 'bg-red-500/20 text-red-400',
-  },
-] as const;
-
 export const ChallengeModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) => {
   const { addOrder } = useOrderStore();
+  const { user } = useAuthStore();
+  
+  const activeCity = user?.city;
+  const baseFee = activeCity?.base_delivery_fee ? Number(activeCity.base_delivery_fee) : 10;
+  const cityCurrency = activeCity?.currency || 'Bs';
+
   const [loading, setLoading] = useState(false);
   const [loadingGeo, setLoadingGeo] = useState(false);
   const [calculating, setCalculating] = useState(false);
   const [showMap, setShowMap] = useState<'pickup' | 'delivery' | null>(null);
 
   const [form, setForm] = useState({
-    type: 'estandar' as 'estandar' | 'express' | 'programada',
+    type: 'estandar' as 'estandar' | 'programada',
     client_name: '',
     description: '',
     pickup: '',
     delivery: '',
     pickupUrl: '',
     deliveryUrl: '',
-    address: '',
-    delivery_fee: 0,
-    urgency: 'media' as 'baja' | 'media' | 'alta',
-    currency: 'Bs',
-    status: 'pendiente',
+    address_a: '',
+    address_b: '',
+    delivery_time: '',
+    delivery_fee: baseFee,
+    currency: cityCurrency,
+    status: 'pending',
     duration: '0 min',
     points: 0,
   });
+
+  const formatDateTime = (date: Date): string => {
+    const yyyy = date.getFullYear();
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const dd = String(date.getDate()).padStart(2, '0');
+    const hh = String(date.getHours()).padStart(2, '0');
+    const min = String(date.getMinutes()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd} ${hh}:${min}`;
+  };
 
   useEffect(() => {
     const updateCalculations = async () => {
@@ -126,28 +96,32 @@ export const ChallengeModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: 
         const distance = calculateDistance(lat1, lon1, lat2, lon2);
         const extraCharge = (await getExtraRateFromBackend(lat2, lon2)) || 0;
         const validDistance = isNaN(distance) ? 0 : distance;
+        
         const estimatedMinutes = Math.round((validDistance / 30) * 60) + 5;
-        const typePoints = { estandar: 10, express: 20, programada: 5 };
-        const basePoints = typePoints[form.type];
-        const distancePoints = Math.floor(validDistance * 2);
+        
+        // standard time auto-calculation
+        const calculatedDate = new Date(Date.now() + estimatedMinutes * 60 * 1000);
+        const standardTimeString = formatDateTime(calculatedDate);
 
         setForm(prev => ({
           ...prev,
-          delivery_fee: parseFloat((distance * GLOBAL_RATE + extraCharge).toFixed(1)),
+          delivery_fee: parseFloat((validDistance * baseFee + extraCharge).toFixed(1)),
           duration: `${estimatedMinutes} minutos`,
-          points: basePoints + distancePoints,
+          points: Math.floor(validDistance * 10),
+          delivery_time: prev.type === 'estandar' ? standardTimeString : prev.delivery_time || formatDateTime(new Date()),
+          currency: cityCurrency,
         }));
         setCalculating(false);
       }
     };
     updateCalculations();
-  }, [form.pickup, form.delivery, form.type]);
+  }, [form.pickup, form.delivery, form.type, baseFee, cityCurrency]);
 
   const handleMapSelection = async (type: 'pickup' | 'delivery', coords: string, address: string) => {
     setForm(prev => ({
       ...prev,
       [type]: coords,
-      address: type === 'delivery' ? address : prev.address,
+      [type === 'pickup' ? 'address_a' : 'address_b']: address,
     }));
     setShowMap(null);
   };
@@ -182,13 +156,12 @@ export const ChallengeModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: 
 
     const updates: any = { [type]: coords, [`${type}Url`]: cleanUrl };
 
-    if (type === 'delivery') {
-      setLoadingGeo(true);
-      try {
-        updates.address = await getAddressFromCoords(coords);
-      } catch {
-        toast.error('No se pudo obtener la dirección');
-      }
+    setLoadingGeo(true);
+    try {
+      const addressName = await getAddressFromCoords(coords);
+      updates[type === 'pickup' ? 'address_a' : 'address_b'] = addressName;
+    } catch {
+      toast.error('No se pudo obtener la dirección');
     }
 
     setForm(prev => ({ ...prev, ...updates }));
@@ -204,13 +177,30 @@ export const ChallengeModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: 
     if (!name || name.length < 3) return;
 
     setLoading(true);
-    await addOrder({ ...form, client_name: name, description: description || '' });
-    onClose();
-    toast.success('¡Carrera creada exitosamente!');
+    const payload = {
+      type:          form.type,
+      client_name:   name,
+      description:   description || '',
+      pickup:        form.pickup,
+      delivery:      form.delivery,
+      address_a:     form.address_a || null,
+      address_b:     form.address_b || null,
+      delivery_fee:  form.delivery_fee,
+      currency:      form.currency,
+      status:        form.status,
+      duration:      form.duration,
+      points:        form.points,
+      delivery_time: form.delivery_time || formatDateTime(new Date()),
+    };
+    
+    const success = await addOrder(payload as any);
+    if (success) {
+      onClose();
+    }
     setLoading(false);
   };
 
-  const isFormValid = form.pickup && form.delivery && !calculating;
+  const isFormValid = form.pickup && form.delivery && !calculating && (form.type === 'estandar' || form.delivery_time !== '');
 
   return (
     <Modal isOpen={isOpen}>
@@ -234,70 +224,6 @@ export const ChallengeModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: 
               <Modal.Body className="overflow-y-auto custom-scrollbar">
                 <Fieldset className="w-full">
                   <Fieldset.Group>
-
-                    {/* ── Tipo de Servicio ──────────────────────────────── */}
-                    <div>
-                      <Label>Tipo de Servicio</Label>
-                      <div className="grid grid-cols-3 gap-3 mt-2">
-                        {SERVICE_TYPES.map((t) => {
-                          const Icon = t.icon;
-                          const isActive = form.type === t.id;
-                          return (
-                            <motion.button
-                              key={t.id}
-                              type="button"
-                              onClick={() => setForm({ ...form, type: t.id as any })}
-                              whileTap={{ scale: 0.96 }}
-                              whileHover={{ scale: 1.02 }}
-                              transition={{ type: 'spring', stiffness: 400, damping: 20 }}
-                              className={cn(
-                                'relative flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all duration-300 cursor-pointer overflow-hidden text-left',
-                                isActive
-                                  ? `bg-gradient-to-b ${t.color} ${t.borderActive}`
-                                  : 'border-divider bg-default-50 hover:bg-default-100'
-                              )}
-                            >
-                              <AnimatePresence>
-                                {isActive && (
-                                  <motion.div
-                                    key="glow"
-                                    className="absolute inset-0 pointer-events-none"
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                    exit={{ opacity: 0 }}
-                                    style={{
-                                      background: `radial-gradient(ellipse at 50% 0%, var(--heroui-primary, #006FEE) 18%, transparent 70%)`,
-                                      opacity: 0.15,
-                                    }}
-                                  />
-                                )}
-                              </AnimatePresence>
-                              <div className={cn('w-9 h-9 rounded-xl flex items-center justify-center transition-all', isActive ? t.iconBg : 'bg-default-200')}>
-                                <Icon className={cn('w-5 h-5 transition-colors', isActive ? t.textActive : 'text-muted-foreground')} />
-                              </div>
-                              <div className="text-center">
-                                <p className={cn('text-xs font-black uppercase tracking-wider', isActive ? t.textActive : 'text-muted-foreground')}>
-                                  {t.label}
-                                </p>
-                                <p className="text-[10px] text-muted-foreground font-medium mt-0.5">{t.description}</p>
-                              </div>
-                              <AnimatePresence>
-                                {isActive && (
-                                  <motion.div
-                                    initial={{ opacity: 0, scale: 0.5 }}
-                                    animate={{ opacity: 1, scale: 1 }}
-                                    exit={{ opacity: 0, scale: 0.5 }}
-                                    className={cn('absolute top-2 right-2 text-[9px] font-black px-1.5 py-0.5 rounded-full', t.iconBg, t.textActive)}
-                                  >
-                                    +{t.points}pts
-                                  </motion.div>
-                                )}
-                              </AnimatePresence>
-                            </motion.button>
-                          );
-                        })}
-                      </div>
-                    </div>
 
                     {/* ── Datos del Cliente ─────────────────────────────── */}
                     <TextField
@@ -371,6 +297,19 @@ export const ChallengeModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: 
                             startContent={<MapPin className="w-3.5 h-3.5 text-muted-foreground" />}
                           />
 
+                          {/* Dirección Manual / Referencia para cada punto */}
+                          <div className="mt-2">
+                            <Label className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Dirección Manual / Referencia</Label>
+                            <Input
+                              placeholder={key === 'pickup' ? 'Ej: Calle Bolivar #456, Puerta Roja' : 'Ej: Av. Villarroel #789, Piso 3, Apto C'}
+                              value={form[key === 'pickup' ? 'address_a' : 'address_b']}
+                              onValueChange={(val) => setForm({ ...form, [key === 'pickup' ? 'address_a' : 'address_b']: val })}
+                              variant="flat"
+                              size="sm"
+                              className="mt-1"
+                            />
+                          </div>
+
                           <AnimatePresence>
                             {form[key] && (
                               <motion.div
@@ -388,66 +327,103 @@ export const ChallengeModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: 
                       ))}
                     </div>
 
-                    {/* ── Dirección Manual ──────────────────────────────── */}
-                    <TextField name="address">
-                      <Label>Dirección Manual / Referencia</Label>
-                      <Input
-                        placeholder="Calle Ficticia 123, Puerta Azul"
-                        value={form.address}
-                        onValueChange={(val) => setForm({ ...form, address: val })}
-                        variant="flat"
-                      />
-                    </TextField>
-
-                    {/* ── Urgencia ──────────────────────────────────────── */}
+                    {/* ── Tipo de Servicio (Movido abajo, donde estaba la Urgencia) ── */}
                     <div>
-                      <Label>Urgencia del Pedido</Label>
-                      <div className="grid grid-cols-3 gap-3 mt-2">
-                        {URGENCY_OPTIONS.map((u) => {
-                           const isActive = form.urgency === u.id;
-                           return (
-                             <motion.button
-                               key={u.id}
-                               type="button"
-                               onClick={() => setForm({ ...form, urgency: u.id as any })}
-                               whileTap={{ scale: 0.95 }}
-                               whileHover={{ scale: 1.02 }}
-                               transition={{ type: 'spring', stiffness: 400, damping: 20 }}
-                               className={cn(
-                                 'relative flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all duration-300 cursor-pointer overflow-hidden',
-                                 isActive
-                                   ? `bg-gradient-to-b ${u.color} ${u.borderActive}`
-                                   : 'border-divider bg-default-50 hover:bg-default-100'
-                               )}
-                             >
-                               <motion.span
-                                 className="text-2xl"
-                                 animate={isActive ? { scale: [1, 1.25, 1] } : { scale: 1 }}
-                                 transition={{ duration: 0.4, ease: 'easeOut' }}
-                               >
-                                 {u.icon}
-                               </motion.span>
-                               <div className="text-center">
-                                 <p className={cn('text-xs font-black uppercase tracking-wider', isActive ? u.textActive : 'text-muted-foreground')}>
-                                   {u.label}
-                                 </p>
-                                 <p className="text-[10px] text-muted-foreground mt-0.5">{u.description}</p>
-                                </div>
-                               <AnimatePresence>
-                                 {isActive && (
-                                   <motion.div
-                                     initial={{ opacity: 0, scale: 0 }}
-                                     animate={{ opacity: 1, scale: 1 }}
-                                     exit={{ opacity: 0, scale: 0 }}
-                                     className={cn('absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full', u.badge.split(' ')[0])}
-                                   />
-                                 )}
-                               </AnimatePresence>
-                             </motion.button>
-                           );
+                      <Label>Tipo de Servicio</Label>
+                      <div className="grid grid-cols-2 gap-3 mt-2">
+                        {SERVICE_TYPES.map((t) => {
+                          const Icon = t.icon;
+                          const isActive = form.type === t.id;
+                          return (
+                            <motion.button
+                              key={t.id}
+                              type="button"
+                              onClick={() => setForm({ ...form, type: t.id as any })}
+                              whileTap={{ scale: 0.96 }}
+                              whileHover={{ scale: 1.02 }}
+                              transition={{ type: 'spring', stiffness: 400, damping: 20 }}
+                              className={cn(
+                                'relative flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all duration-300 cursor-pointer overflow-hidden text-left',
+                                isActive
+                                  ? `bg-gradient-to-b ${t.color} ${t.borderActive}`
+                                  : 'border-divider bg-default-50 hover:bg-default-100'
+                              )}
+                            >
+                              <AnimatePresence>
+                                {isActive && (
+                                  <motion.div
+                                    key="glow"
+                                    className="absolute inset-0 pointer-events-none"
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                    style={{
+                                      background: `radial-gradient(ellipse at 50% 0%, var(--heroui-primary, #006FEE) 18%, transparent 70%)`,
+                                      opacity: 0.15,
+                                    }}
+                                  />
+                                )}
+                              </AnimatePresence>
+                              <div className={cn('w-9 h-9 rounded-xl flex items-center justify-center transition-all', isActive ? t.iconBg : 'bg-default-200')}>
+                                <Icon className={cn('w-5 h-5 transition-colors', isActive ? t.textActive : 'text-muted-foreground')} />
+                              </div>
+                              <div className="text-center">
+                                <p className={cn('text-xs font-black uppercase tracking-wider', isActive ? t.textActive : 'text-muted-foreground')}>
+                                  {t.label}
+                                </p>
+                                <p className="text-[10px] text-muted-foreground font-medium mt-0.5">{t.description}</p>
+                              </div>
+                              <AnimatePresence>
+                                {isActive && (
+                                  <motion.div
+                                    initial={{ opacity: 0, scale: 0.5 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    exit={{ opacity: 0, scale: 0.5 }}
+                                    className={cn('absolute top-2 right-2 text-[9px] font-black px-1.5 py-0.5 rounded-full', t.iconBg, t.textActive)}
+                                  >
+                                    {t.id === 'estandar' ? 'Auto' : 'Fijo'}
+                                  </motion.div>
+                                )}
+                              </AnimatePresence>
+                            </motion.button>
+                          );
                         })}
                       </div>
                     </div>
+
+                    {/* Selector de fecha y hora para pedidos Programados */}
+                    <AnimatePresence mode="wait">
+                      {form.type === 'programada' && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="w-full"
+                        >
+                          <TextField name="delivery_time">
+                            <Label>Fecha y Hora de Entrega Programada</Label>
+                            <Input
+                              type="datetime-local"
+                              value={form.delivery_time ? form.delivery_time.replace(' ', 'T') : ''}
+                              onValueChange={(val) => setForm({ ...form, delivery_time: val.replace('T', ' ') })}
+                              variant="flat"
+                            />
+                            <Description>Especifica la fecha y hora en la que debe ser entregada la carrera</Description>
+                          </TextField>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+
+                    {/* Previsualización de la hora programada / estimada */}
+                    {form.pickup && form.delivery && (
+                      <div className="text-xs font-semibold text-muted-foreground flex items-center gap-2 bg-default-100 p-3.5 rounded-2xl border border-divider">
+                        <Clock className="w-4 h-4 text-primary animate-pulse" />
+                        <span>
+                          {form.type === 'estandar' ? 'Hora Estimada de Entrega: ' : 'Hora de Entrega Programada: '}
+                          <strong className="text-foreground">{form.delivery_time || 'No especificada'}</strong>
+                        </span>
+                      </div>
+                    )}
 
                     {/* ── Resumen de Costos ─────────────────────────────── */}
                     <motion.div
@@ -472,7 +448,7 @@ export const ChallengeModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: 
                         <div className="space-y-0.5">
                           <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Costo de Carrera</span>
                           <div className="text-3xl font-display font-black text-foreground">
-                            Bs. <span className="text-primary">{form.delivery_fee}</span>
+                            {cityCurrency} <span className="text-primary">{form.delivery_fee}</span>
                           </div>
                           <span className="text-[10px] text-muted-foreground">{form.duration}</span>
                         </div>
@@ -494,7 +470,7 @@ export const ChallengeModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: 
                       isLoading={loading}
                       size="lg"
                       color={isFormValid ? "primary" : "default"}
-                      className="w-full h-14 font-black rounded-xl text-lg transition-all shadow-lg"
+                      className="w-full h-14 font-black rounded-xl text-lg transition-all shadow-lg cursor-pointer"
                     >
                       {loading ? 'PROCESANDO...' : calculating ? 'ESPERE...' : 'CREAR CARRERA'}
                     </Button>
@@ -503,7 +479,7 @@ export const ChallengeModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: 
                       variant="flat"
                       onPress={onClose}
                       size="lg"
-                      className="w-full h-12 rounded-xl font-bold text-muted-foreground"
+                      className="w-full h-12 rounded-xl font-bold text-muted-foreground cursor-pointer"
                     >
                       Cancelar
                     </Button>

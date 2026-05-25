@@ -118,7 +118,7 @@ const AdminDashboard = () => {
             {orders.map((order: any, index: number) => {
               const config = orderTypeConfig[order.type] || orderTypeConfig.estandar;
               const { icon: TypeIcon, label, color } = config;
-              const borderColor = order.urgency === 'alta' ? '#FF0000' : order.urgency === 'media' ? '#FFA500' : '#00FF00';
+              const borderColor = order.type === 'programada' ? '#a855f7' : '#0070f0';
 
               // Recalculo de distancia entre pickup y delivery (coordenadas backend)
               let displayDistance = '0 km';
@@ -157,13 +157,13 @@ const AdminDashboard = () => {
                     <div className="flex items-center gap-2">
                       <span className={cn(
                         "text-[9px] px-1.5 py-0.5 rounded font-black uppercase tracking-wider",
-                        order.urgency === 'alta' ? 'bg-destructive/10 text-destructive' : 'bg-success/10 text-success'
+                        order.type === 'programada' ? 'bg-primary/10 text-primary' : 'bg-success/10 text-success'
                       )}>
-                        {order.urgency}
+                        {label}
                       </span>
                       <button
                         onClick={() => handleDelete(order.id)}
-                        className="text-muted-foreground hover:text-destructive transition-colors p-1"
+                        className="text-muted-foreground hover:text-destructive transition-colors p-1 cursor-pointer"
                       >
                         <X className="w-4 h-4" />
                       </button>
@@ -176,17 +176,14 @@ const AdminDashboard = () => {
                       <div className="absolute -left-[23px] top-1 w-3 h-3 rounded-full bg-success border-4 border-background shadow-sm" />
                       <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-tighter">Origen: </p>
                       <p className="text-xs font-bold text-foreground">
-                        {/* CORRECCIÓN AQUÍ */}
-                        <AddressText coords={order.pickup} />
+                        {order.address_a || <AddressText coords={order.pickup} />}
                       </p>
                     </div>
                     <div className="relative">
                       <div className="absolute -left-[23px] top-1 w-3 h-3 rounded-full bg-destructive border-4 border-background shadow-sm" />
                       <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-tighter">Destino: </p>
                       <p className="text-xs font-bold text-foreground">
-                        {/* Si el backend ya trae 'address', úsalo directamente, 
-                si no, usa el componente AddressText */}
-                        {order.address || <AddressText coords={order.delivery} />}
+                        {order.address_b || <AddressText coords={order.delivery} />}
                       </p>
                     </div>
                   </div>
@@ -217,8 +214,9 @@ const AdminDashboard = () => {
                     </div>
 
                     {/* ETA Badge */}
-                    <div className="bg-primary/5 px-2 py-1 rounded-lg flex items-center gap-1">
-                      <Clock className="w-3 h-3 text-primary" />
+                    <div className="bg-primary/5 px-2 py-1 rounded-lg flex items-center gap-1.5">
+                      <span className="text-[9px] font-black text-muted-foreground">Entrega: {order.delivery_time}</span>
+                      <Clock className="w-3 h-3 text-primary ml-1" />
                       <span className="text-[10px] font-bold text-primary">{order.duration}</span>
                     </div>
                   </div>

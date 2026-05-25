@@ -6,15 +6,19 @@ import { zoneSchema, checkRateSchema } from '../validations/zone.validation';
 
 const router = Router();
 
+// Rutas públicas — no requieren auth
+router.get('/check-rate', validate(checkRateSchema), ZoneController.checkRate);
+router.get('/active-zones', ZoneController.activeZones);
+
+// Rutas protegidas
 router.use(authMiddleware);
 
 router.get('/', ZoneController.index);
 router.post('/', validate(zoneSchema), ZoneController.store);
-router.get('/check-rate', validate(checkRateSchema), ZoneController.checkRate);
-router.get('/active-zones', ZoneController.activeZones);
 router.post('/maps/expand-url', ZoneController.expandUrl);
 router.get('/:id', ZoneController.show);
 router.put('/:id', validate(zoneSchema), ZoneController.update);
 router.delete('/:id', ZoneController.destroy);
 
 export default router;
+

@@ -60,13 +60,11 @@ export const AdminOrders = () => {
             <div className="px-4 space-y-4">
                 {orders.map((order: any, index: number) => {
                     const config = orderTypeConfig[order.type] || orderTypeConfig.estandar;
-                    const { icon: TypeIcon, label, color } = config;
-
-                    // Cálculo de distancia dinámica
+                    const { icon: TypeIcon, label, color } = config;                    // Cálculo de distancia dinámica
                     const [pLat, pLng] = order.pickup.split(',').map(Number);
                     const [dLat, dLng] = order.delivery.split(',').map(Number);
                     const km = calculateDistance(pLat, pLng, dLat, dLng);
-                    const borderColor = order.urgency === 'alta' ? '#FF0000' : order.urgency === 'media' ? '#FFA500' : '#00FF00';
+                    const borderColor = order.type === 'programada' ? '#a855f7' : '#0070f0';
 
                     return (
                         <motion.div
@@ -90,16 +88,16 @@ export const AdminOrders = () => {
                                                 ID: #{order.id}
                                             </span>
                                             <span className={cn("text-[9px] font-black uppercase px-1.5 py-0.5 rounded",
-                                                order.urgency === 'alta' ? 'bg-destructive/10 text-destructive' : 'bg-success/10 text-success'
+                                                order.type === 'programada' ? 'bg-primary/10 text-primary' : 'bg-success/10 text-success'
                                             )}>
-                                                {order.urgency}
+                                                {label}
                                             </span>
                                         </div>
                                     </div>
                                 </div>
                                 <Button
                                     variant="ghost" size="icon"
-                                    className="text-muted-foreground hover:text-destructive hover:bg-destructive/5 rounded-full"
+                                    className="text-muted-foreground hover:text-destructive hover:bg-destructive/5 rounded-full cursor-pointer"
                                     onClick={() => handleDelete(order.id)}
                                 >
                                     <Trash2 className="w-4 h-4" />
@@ -112,17 +110,14 @@ export const AdminOrders = () => {
                                     <div className="absolute -left-[23px] top-1 w-3 h-3 rounded-full bg-success border-4 border-background shadow-sm" />
                                     <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-tighter">Origen: </p>
                                     <p className="text-xs font-bold text-foreground">
-                                        {/* CORRECCIÓN AQUÍ */}
-                                        <AddressText coords={order.pickup} />
+                                        {order.address_a || <AddressText coords={order.pickup} />}
                                     </p>
                                 </div>
                                 <div className="relative">
                                     <div className="absolute -left-[23px] top-1 w-3 h-3 rounded-full bg-destructive border-4 border-background shadow-sm" />
                                     <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-tighter">Destino: </p>
                                     <p className="text-xs font-bold text-foreground">
-                                        {/* Si el backend ya trae 'address', úsalo directamente, 
-                si no, usa el componente AddressText */}
-                                        {order.address || <AddressText coords={order.delivery} />}
+                                        {order.address_b || <AddressText coords={order.delivery} />}
                                     </p>
                                 </div>
                             </div>
@@ -158,12 +153,10 @@ export const AdminOrders = () => {
                                 </div>
                             </div>
 
-                            {/* ETA Badge */}
-                            {/* Tiempo estimado de entrega */}
-
+                            {/* ETA / Scheduled Delivery Badge */}
                             <div className="absolute top-4 right-12 flex items-center gap-1 bg-primary/10 text-primary px-2 py-0.5 rounded-full">
-                                <span className="text-[9px] font-black">Tiempo estimado de entrega: </span>
-                                <Clock className="w-2.5 h-2.5" />
+                                <span className="text-[9px] font-black">Entrega: {order.delivery_time}</span>
+                                <Clock className="w-2.5 h-2.5 ml-1" />
                                 <span className="text-[9px] font-black">{order.duration}</span>
                             </div>
                         </motion.div>

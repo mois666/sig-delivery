@@ -10,23 +10,13 @@ interface ChallengeCardProps {
   onAccept: (orderId: string) => void;
 }
 
-const orderTypeConfig: Record<IOrderType, { icon: typeof Zap; label: string; className: string }> = {
-  express: { icon: Zap, label: 'Express', className: 'bg-warning/20 text-warning border-warning/30' },
+const orderTypeConfig: Record<IOrderType, { icon: typeof Package; label: string; className: string }> = {
   estandar: { icon: Package, label: 'Estándar', className: 'bg-success/20 text-success border-success/30' },
   programada: { icon: Calendar, label: 'Programada', className: 'bg-primary/20 text-primary border-primary/30' },
 };
 
-const urgencyConfig = {
-  alta: { label: 'URGENTE', className: 'bg-destructive text-destructive-foreground animate-pulse' },
-  media: { label: 'MODERADO', className: 'bg-warning text-warning-foreground' },
-  baja: { label: 'FLEXIBLE', className: 'bg-muted text-muted-foreground' },
-};
-
 const ChallengeCard = ({ order, onAccept }: ChallengeCardProps) => {
   const { icon: TypeIcon, label: typeLabel, className: typeClassName } = orderTypeConfig[order.type];
-  const { label: urgencyLabel, className: urgencyClassName } = urgencyConfig[order.urgency];
-
-  //const timeRemaining = Math.max(0, Math.floor((order.expiresAt.getTime() - Date.now()) / 60000));
 
   return (
     <motion.div
@@ -37,11 +27,6 @@ const ChallengeCard = ({ order, onAccept }: ChallengeCardProps) => {
       whileTap={{ scale: 0.98 }}
       className="glass-card p-4 relative overflow-hidden"
     >
-      {/* Glow effect for urgent orders */}
-      {order.urgency === 'alta' && (
-        <div className="absolute inset-0 bg-destructive/5 animate-pulse" />
-      )}
-
       {/* Header */}
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-2">
@@ -49,9 +34,6 @@ const ChallengeCard = ({ order, onAccept }: ChallengeCardProps) => {
             <TypeIcon className="w-4 h-4" />
             <span className="text-xs font-semibold">{typeLabel}</span>
           </div>
-          <Badge className={cn('text-[10px] font-bold', urgencyClassName)}>
-            {urgencyLabel}
-          </Badge>
         </div>
         <div className="flex items-center gap-1 text-muted-foreground">
           <Clock className="w-4 h-4" />
@@ -59,12 +41,24 @@ const ChallengeCard = ({ order, onAccept }: ChallengeCardProps) => {
         </div>
       </div>
 
-      {/* Zone & Distance */}
-      <div className="flex items-center gap-2 mb-3">
-        <MapPin className="w-4 h-4 text-primary" />
-        <span className="text-sm font-medium text-foreground">{"order.zone"}</span>
-        <span className="text-muted-foreground">•</span>
-        <span className="text-sm text-muted-foreground">{"order.distance"}</span>
+      {/* Addresses */}
+      <div className="space-y-1 mb-4 text-xs text-muted-foreground">
+        {order.address_a && (
+          <div className="flex items-center gap-1.5 truncate">
+            <span className="w-3.5 h-3.5 rounded bg-blue-500/10 text-blue-400 flex items-center justify-center text-[8px] font-black">A</span>
+            <span className="truncate text-foreground font-medium">{order.address_a}</span>
+          </div>
+        )}
+        {order.address_b && (
+          <div className="flex items-center gap-1.5 truncate">
+            <span className="w-3.5 h-3.5 rounded bg-primary/10 text-primary flex items-center justify-center text-[8px] font-black">B</span>
+            <span className="truncate text-foreground font-medium">{order.address_b}</span>
+          </div>
+        )}
+        <div className="flex items-center gap-1.5 mt-2 font-bold text-foreground">
+          <Calendar className="w-3.5 h-3.5 text-primary" />
+          <span>Entrega: {order.delivery_time}</span>
+        </div>
       </div>
 
       {/* Rewards */}
@@ -101,7 +95,7 @@ const ChallengeCard = ({ order, onAccept }: ChallengeCardProps) => {
       <Button
         onClick={() => onAccept(order.id)}
         color="primary"
-        className="w-full font-bold h-12 touch-target shadow-lg shadow-primary/20"
+        className="w-full font-bold h-12 touch-target shadow-lg shadow-primary/20 cursor-pointer"
       >
         <span>Aceptar Entrega</span>
         <ChevronRight className="w-5 h-5 ml-2" />

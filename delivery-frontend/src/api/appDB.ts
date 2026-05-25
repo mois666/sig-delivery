@@ -40,7 +40,7 @@ appDB.interceptors.response.use(
                     { withCredentials: true }
                 );
 
-                useAuthStore.getState().setAuth(data.user, data.accessToken, data.city);
+                useAuthStore.getState().setAuth(data.user, data.accessToken);
                 originalRequest.headers.Authorization = `Bearer ${data.accessToken}`;
                 return appDB(originalRequest);
             } catch (refreshError) {

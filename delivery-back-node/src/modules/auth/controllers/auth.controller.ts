@@ -31,7 +31,7 @@ export class AuthController {
       const resolvedCityId = city_id ? Number(city_id) : 1;
       const city = await prisma.city.findUnique({
         where: { id: resolvedCityId },
-        select: { id: true, name: true, country: true, currency: true },
+        select: { id: true, name: true, country: true, currency: true, base_delivery_fee: true, center_lat_lng: true, is_active: true },
       });
 
       const accessToken = jwt.sign(
@@ -82,7 +82,7 @@ export class AuthController {
       const resolvedCityId = decoded.city_id ? Number(decoded.city_id) : 1;
       const city = await prisma.city.findUnique({
         where: { id: resolvedCityId },
-        select: { id: true, name: true, country: true, currency: true },
+        select: { id: true, name: true, country: true, currency: true, base_delivery_fee: true, center_lat_lng: true, is_active: true },
       });
 
       const newAccessToken = jwt.sign(

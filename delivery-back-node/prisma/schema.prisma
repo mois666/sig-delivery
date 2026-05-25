@@ -108,10 +108,11 @@ model Order {
   client_name      String   @db.VarChar(100)
   pickup           String // Dirección de recogida
   delivery         String // Dirección de entrega
-  address          String?  @db.Text
+  address_a        String?  @db.Text
+  address_b        String?  @db.Text
+  delivery_time    DateTime @db.Timestamp
   address_metadata Json?
   delivery_fee     Decimal  @db.Decimal(10, 2)
-  urgency          Urgency  @default(baja)
   description      String?  @db.Text
   currency         String   @default("BOB") @db.VarChar(3)
   status           String   @default("pending") @db.VarChar(30)

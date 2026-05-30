@@ -80,13 +80,13 @@ export const extractCoords = (url: string): string | null => {
 };
 
 /**
- * Obtiene el recargo de zona consultando al backend.
- * El backend utiliza la base de datos de polígonos para determinar el costo extra.
+ * @deprecated Usar POST /orders/calculate-fee (PricingService en el backend).
+ * Este endpoint sólo devolvía el extra_rate de un punto, sin considerar
+ * la ruta completa ni las intersecciones reales con zonas (ST_Intersection).
+ * Se mantiene por compatibilidad con código heredado.
  */
 export const getExtraRateFromBackend = async (lat: number, lng: number): Promise<number> => {
-    //console.log("lat, lng", lat, lng);
     try {
-        // Consultamos al endpoint de Laravel que maneja la lógica de polígonos
         const { data } = await appDB.get(`/zones/check-rate`, {
             params: { lat, lng }
         });
@@ -95,9 +95,10 @@ export const getExtraRateFromBackend = async (lat: number, lng: number): Promise
         if (axios.isAxiosError(error)) {
             logger.error("Error al verificar tarifa de la zona:", error.response?.data);
         }
-        return 0; // Fallback seguro
+        return 0;
     }
 };
+
 
 /**
  * Convierte coordenadas en una dirección legible (Geocoding Inverso).

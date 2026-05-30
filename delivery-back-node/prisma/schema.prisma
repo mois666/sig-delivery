@@ -112,6 +112,7 @@ model Order {
   address_b        String?  @db.Text
   delivery_time    DateTime @db.Timestamp
   address_metadata Json?
+  pricing_details  Json? // Snapshot completo del cálculo geoespacial (OSRM + PostGIS)
   delivery_fee     Decimal  @db.Decimal(10, 2)
   description      String?  @db.Text
   currency         String   @default("BOB") @db.VarChar(3)
@@ -179,16 +180,16 @@ model Transaction {
 // ─── Zonas de Entrega ─────────────────────────────────────────────────────────
 
 model Zone {
-  id         Int                                    @id @default(autoincrement())
+  id         Int                                         @id @default(autoincrement())
   name       String
-  extra_rate Decimal                                @default(0) @db.Decimal(8, 2)
-  color      String                                 @default("#ff0000")
-  is_active  Boolean                                @default(true)
-  polygon    Unsupported("geometry(Polygon, 4326)")
+  extra_rate Decimal                                     @default(1.0) @db.Decimal(8, 2)
+  color      String                                      @default("#ff0000")
+  is_active  Boolean                                     @default(true)
+  polygon    Unsupported("geometry(MultiPolygon, 4326)")
   city_id    Int
-  created_at DateTime                               @default(now())
-  updated_at DateTime                               @updatedAt
-  city       City                                   @relation(fields: [city_id], references: [id])
+  created_at DateTime                                    @default(now())
+  updated_at DateTime                                    @updatedAt
+  city       City                                        @relation(fields: [city_id], references: [id])
 
   @@map("zones")
 }

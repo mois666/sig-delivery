@@ -7,7 +7,9 @@ import { orderStoreSchema, orderUpdateSchema } from '../validations/order.valida
 const router = Router();
 
 // Rutas públicas
+router.post('/calculate-fee', OrderController.calculateFee);
 router.post('/', validate(orderStoreSchema), OrderController.store);
+
 
 // Rutas protegidas
 router.use(authMiddleware);

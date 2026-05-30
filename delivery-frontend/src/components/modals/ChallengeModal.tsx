@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Zap, Clock, MapPin, Loader2, Rocket, Package, Map as MapIcon, Save, X, Calendar } from 'lucide-react';
+import { Zap, Clock, MapPin, Loader2, Package, Map as MapIcon, X, Calendar, ChevronDown, AlertTriangle, TrendingUp } from 'lucide-react';
 import {
   Button,
   Description,
@@ -17,11 +17,33 @@ import { useOrderStore } from '@/stores/orderStore';
 import { useAuthStore } from '@/stores/authStore';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import { calculateDistance, extractCoords, getAddressFromCoords, getExtraRateFromBackend } from '@/lib/geoUtils';
+import { extractCoords, getAddressFromCoords } from '@/lib/geoUtils';
 import { MapPicker } from '../maps/MapPicker';
 import { appDB } from '@/api/appDB';
 
-// ─── Tipo de Servicio ────────────────────────────────────────────────────────
+// ─── Tipos ────────────────────────────────────────────────────────────────────
+
+interface ZoneCrossing {
+  zone_id:     number;
+  zone_name:   string;
+  distance_km: number;
+  extra_rate:  number;
+  cost:        number;
+}
+
+interface PricingDetails {
+  base_fee:            number;
+  total_distance_km:   number;
+  normal_distance_km:  number;
+  normal_cost:         number;
+  zones:               ZoneCrossing[];
+  total_delivery_fee:  number;
+  duration_seconds:    number;
+  route_geometry:      object | null;
+}
+
+// ─── Tipos de Servicio ────────────────────────────────────────────────────────
+
 const SERVICE_TYPES = [
   {
     id: 'estandar',
@@ -32,7 +54,6 @@ const SERVICE_TYPES = [
     borderActive: 'border-blue-500',
     textActive: 'text-blue-400',
     iconBg: 'bg-blue-500/20',
-    points: 10,
   },
   {
     id: 'programada',
@@ -43,80 +64,126 @@ const SERVICE_TYPES = [
     borderActive: 'border-purple-500',
     textActive: 'text-purple-400',
     iconBg: 'bg-purple-500/20',
-    points: 5,
   },
 ] as const;
 
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+const formatDateTime = (date: Date): string => {
+  const yyyy = date.getFullYear();
+  const mm   = String(date.getMonth() + 1).padStart(2, '0');
+  const dd   = String(date.getDate()).padStart(2, '0');
+  const hh   = String(date.getHours()).padStart(2, '0');
+  const min  = String(date.getMinutes()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd} ${hh}:${min}`;
+};
+
+/** Convierte extra_rate a etiqueta descriptiva */
+const getZoneLabel = (rate: number): { label: string; color: string } => {
+  if (rate >= 1.0) return { label: 'Normal',       color: 'text-emerald-400' };
+  if (rate >= 0.8) return { label: 'Fácil',         color: 'text-green-400'   };
+  if (rate >= 0.6) return { label: 'Media',          color: 'text-yellow-400'  };
+  if (rate >= 0.4) return { label: 'Difícil',        color: 'text-orange-400'  };
+  if (rate >= 0.2) return { label: 'Muy difícil',    color: 'text-red-400'     };
+  return                   { label: 'Extremo',        color: 'text-rose-600'    };
+};
+
+// ─── Componente Principal ─────────────────────────────────────────────────────
+
 export const ChallengeModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) => {
   const { addOrder } = useOrderStore();
-  const { user } = useAuthStore();
-  
-  const activeCity = user?.city;
-  const baseFee = activeCity?.base_delivery_fee ? Number(activeCity.base_delivery_fee) : 10;
-  const cityCurrency = activeCity?.currency || 'Bs';
+  const { user }     = useAuthStore();
 
-  const [loading, setLoading] = useState(false);
-  const [loadingGeo, setLoadingGeo] = useState(false);
-  const [calculating, setCalculating] = useState(false);
-  const [showMap, setShowMap] = useState<'pickup' | 'delivery' | null>(null);
+  const activeCity    = user?.city;
+  const baseFee       = activeCity?.base_delivery_fee ? Number(activeCity.base_delivery_fee) : 10;
+  const cityCurrency  = activeCity?.currency || 'Bs';
+  const cityId        = activeCity?.id ?? 1;
+
+  const [loading,       setLoading]       = useState(false);
+  const [loadingGeo,    setLoadingGeo]    = useState(false);
+  const [calculating,   setCalculating]   = useState(false);
+  const [showMap,       setShowMap]       = useState<'pickup' | 'delivery' | null>(null);
+  const [pricingDetails, setPricingDetails] = useState<PricingDetails | null>(null);
+  const [showBreakdown, setShowBreakdown] = useState(false);
 
   const [form, setForm] = useState({
-    type: 'estandar' as 'estandar' | 'programada',
-    client_name: '',
-    description: '',
-    pickup: '',
-    delivery: '',
-    pickupUrl: '',
-    deliveryUrl: '',
-    address_a: '',
-    address_b: '',
+    type:          'estandar' as 'estandar' | 'programada',
+    client_name:   '',
+    description:   '',
+    pickup:        '',
+    delivery:      '',
+    pickupUrl:     '',
+    deliveryUrl:   '',
+    address_a:     '',
+    address_b:     '',
     delivery_time: '',
-    delivery_fee: baseFee,
-    currency: cityCurrency,
-    status: 'pending',
-    duration: '0 min',
-    points: 0,
+    delivery_fee:  baseFee,
+    currency:      cityCurrency,
+    status:        'pending',
+    duration:      '0 min',
+    points:        0,
   });
 
-  const formatDateTime = (date: Date): string => {
-    const yyyy = date.getFullYear();
-    const mm = String(date.getMonth() + 1).padStart(2, '0');
-    const dd = String(date.getDate()).padStart(2, '0');
-    const hh = String(date.getHours()).padStart(2, '0');
-    const min = String(date.getMinutes()).padStart(2, '0');
-    return `${yyyy}-${mm}-${dd} ${hh}:${min}`;
-  };
+  // ── Calcular precio desde el backend ────────────────────────────────────────
+  const fetchPricing = useCallback(async (pickup: string, delivery: string) => {
+    if (!pickup || !delivery) return;
 
+    setCalculating(true);
+    try {
+      const { data } = await appDB.post<PricingDetails>('/orders/calculate-fee', {
+        pickup,
+        delivery,
+        city_id: cityId,
+      });
+
+      setPricingDetails(data);
+
+      const durationMinutes = data.duration_seconds > 0
+        ? Math.round(data.duration_seconds / 60) + 2
+        : Math.round((data.total_distance_km / 30) * 60) + 5;
+
+      const estimatedDate = new Date(Date.now() + durationMinutes * 60 * 1000);
+
+      setForm(prev => ({
+        ...prev,
+        delivery_fee:  data.total_delivery_fee,
+        duration:      `${durationMinutes} minutos`,
+        points:        Math.round(data.total_distance_km * 10),
+        currency:      cityCurrency,
+        delivery_time: prev.type === 'estandar'
+          ? formatDateTime(estimatedDate)
+          : (prev.delivery_time || formatDateTime(new Date())),
+      }));
+    } catch (err) {
+      console.error('[ChallengeModal] Error en calculate-fee:', err);
+      toast.error('No se pudo calcular el precio. Usando tarifa base.');
+      // Fallback: usar tarifa base
+      setForm(prev => ({ ...prev, delivery_fee: baseFee }));
+      setPricingDetails(null);
+    } finally {
+      setCalculating(false);
+    }
+  }, [cityId, cityCurrency, baseFee]);
+
+  // Recalcular cuando cambien las coordenadas o el tipo de servicio
   useEffect(() => {
-    const updateCalculations = async () => {
-      if (form.pickup && form.delivery) {
-        setCalculating(true);
-        const [lat1, lon1] = form.pickup.split(',').map(Number);
-        const [lat2, lon2] = form.delivery.split(',').map(Number);
-        const distance = calculateDistance(lat1, lon1, lat2, lon2);
-        const extraCharge = (await getExtraRateFromBackend(lat2, lon2)) || 0;
-        const validDistance = isNaN(distance) ? 0 : distance;
-        
-        const estimatedMinutes = Math.round((validDistance / 30) * 60) + 5;
-        
-        // standard time auto-calculation
-        const calculatedDate = new Date(Date.now() + estimatedMinutes * 60 * 1000);
-        const standardTimeString = formatDateTime(calculatedDate);
+    if (form.pickup && form.delivery) {
+      fetchPricing(form.pickup, form.delivery);
+    }
+  }, [form.pickup, form.delivery]);
 
-        setForm(prev => ({
-          ...prev,
-          delivery_fee: parseFloat((validDistance * baseFee + extraCharge).toFixed(1)),
-          duration: `${estimatedMinutes} minutos`,
-          points: Math.floor(validDistance * 10),
-          delivery_time: prev.type === 'estandar' ? standardTimeString : prev.delivery_time || formatDateTime(new Date()),
-          currency: cityCurrency,
-        }));
-        setCalculating(false);
-      }
-    };
-    updateCalculations();
-  }, [form.pickup, form.delivery, form.type, baseFee, cityCurrency]);
+  // Recalcular delivery_time cuando cambie el tipo de servicio
+  useEffect(() => {
+    if (form.type === 'estandar' && pricingDetails) {
+      const durationMinutes = pricingDetails.duration_seconds > 0
+        ? Math.round(pricingDetails.duration_seconds / 60) + 2
+        : 10;
+      const estimatedDate = new Date(Date.now() + durationMinutes * 60 * 1000);
+      setForm(prev => ({ ...prev, delivery_time: formatDateTime(estimatedDate) }));
+    }
+  }, [form.type]);
 
+  // ── Selección de mapa ────────────────────────────────────────────────────────
   const handleMapSelection = async (type: 'pickup' | 'delivery', coords: string, address: string) => {
     setForm(prev => ({
       ...prev,
@@ -126,6 +193,7 @@ export const ChallengeModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: 
     setShowMap(null);
   };
 
+  // ── Pegar enlace de Google Maps ──────────────────────────────────────────────
   const handleUrlPaste = async (type: 'pickup' | 'delivery', url: string) => {
     const cleanUrl = url.trim();
     if (!cleanUrl) return;
@@ -145,7 +213,7 @@ export const ChallengeModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: 
         toast.error('No se pudo procesar el enlace corto');
       }
     } else {
-      coords = extractCoords(cleanUrl);
+      coords = extractCoords(cleanUrl) ?? '';
     }
 
     if (!coords) {
@@ -168,19 +236,21 @@ export const ChallengeModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: 
     setLoadingGeo(false);
   };
 
+  // ── Crear orden ──────────────────────────────────────────────────────────────
   const handleCreate = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!form.pickup || !form.delivery || calculating) return;
+
     const formData = new FormData(e.currentTarget);
-    const name = formData.get('client_name') as string;
-    const description = formData.get('description') as string;
+    const name     = formData.get('client_name') as string;
+    const desc     = formData.get('description') as string;
     if (!name || name.length < 3) return;
 
     setLoading(true);
     const payload = {
       type:          form.type,
       client_name:   name,
-      description:   description || '',
+      description:   desc || '',
       pickup:        form.pickup,
       delivery:      form.delivery,
       address_a:     form.address_a || null,
@@ -191,16 +261,16 @@ export const ChallengeModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: 
       duration:      form.duration,
       points:        form.points,
       delivery_time: form.delivery_time || formatDateTime(new Date()),
+      city_id:       cityId,
     };
-    
+
     const success = await addOrder(payload as any);
-    if (success) {
-      onClose();
-    }
+    if (success) onClose();
     setLoading(false);
   };
 
-  const isFormValid = form.pickup && form.delivery && !calculating && (form.type === 'estandar' || form.delivery_time !== '');
+  const isFormValid = form.pickup && form.delivery && !calculating &&
+    (form.type === 'estandar' || form.delivery_time !== '');
 
   return (
     <Modal isOpen={isOpen}>
@@ -225,7 +295,7 @@ export const ChallengeModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: 
                 <Fieldset className="w-full">
                   <Fieldset.Group>
 
-                    {/* ── Datos del Cliente ─────────────────────────────── */}
+                    {/* ── Datos del Cliente ─────────────────────────── */}
                     <TextField
                       isRequired
                       name="client_name"
@@ -249,7 +319,7 @@ export const ChallengeModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: 
                       <Description>Detalles adicionales del encargo</Description>
                     </TextField>
 
-                    {/* ── Ubicaciones ───────────────────────────────────── */}
+                    {/* ── Ubicaciones ───────────────────────────────── */}
                     <div className="grid grid-cols-1 gap-4">
                       {(['pickup', 'delivery'] as const).map((key) => (
                         <div key={key} className="p-4 bg-default-50 rounded-2xl border border-divider space-y-3">
@@ -297,7 +367,7 @@ export const ChallengeModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: 
                             startContent={<MapPin className="w-3.5 h-3.5 text-muted-foreground" />}
                           />
 
-                          {/* Dirección Manual / Referencia para cada punto */}
+                          {/* Dirección Manual */}
                           <div className="mt-2">
                             <Label className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Dirección Manual / Referencia</Label>
                             <Input
@@ -327,12 +397,12 @@ export const ChallengeModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: 
                       ))}
                     </div>
 
-                    {/* ── Tipo de Servicio (Movido abajo, donde estaba la Urgencia) ── */}
+                    {/* ── Tipo de Servicio ──────────────────────────── */}
                     <div>
                       <Label>Tipo de Servicio</Label>
                       <div className="grid grid-cols-2 gap-3 mt-2">
                         {SERVICE_TYPES.map((t) => {
-                          const Icon = t.icon;
+                          const Icon     = t.icon;
                           const isActive = form.type === t.id;
                           return (
                             <motion.button
@@ -349,21 +419,6 @@ export const ChallengeModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: 
                                   : 'border-divider bg-default-50 hover:bg-default-100'
                               )}
                             >
-                              <AnimatePresence>
-                                {isActive && (
-                                  <motion.div
-                                    key="glow"
-                                    className="absolute inset-0 pointer-events-none"
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                    exit={{ opacity: 0 }}
-                                    style={{
-                                      background: `radial-gradient(ellipse at 50% 0%, var(--heroui-primary, #006FEE) 18%, transparent 70%)`,
-                                      opacity: 0.15,
-                                    }}
-                                  />
-                                )}
-                              </AnimatePresence>
                               <div className={cn('w-9 h-9 rounded-xl flex items-center justify-center transition-all', isActive ? t.iconBg : 'bg-default-200')}>
                                 <Icon className={cn('w-5 h-5 transition-colors', isActive ? t.textActive : 'text-muted-foreground')} />
                               </div>
@@ -373,25 +428,13 @@ export const ChallengeModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: 
                                 </p>
                                 <p className="text-[10px] text-muted-foreground font-medium mt-0.5">{t.description}</p>
                               </div>
-                              <AnimatePresence>
-                                {isActive && (
-                                  <motion.div
-                                    initial={{ opacity: 0, scale: 0.5 }}
-                                    animate={{ opacity: 1, scale: 1 }}
-                                    exit={{ opacity: 0, scale: 0.5 }}
-                                    className={cn('absolute top-2 right-2 text-[9px] font-black px-1.5 py-0.5 rounded-full', t.iconBg, t.textActive)}
-                                  >
-                                    {t.id === 'estandar' ? 'Auto' : 'Fijo'}
-                                  </motion.div>
-                                )}
-                              </AnimatePresence>
                             </motion.button>
                           );
                         })}
                       </div>
                     </div>
 
-                    {/* Selector de fecha y hora para pedidos Programados */}
+                    {/* ── Fecha programada ──────────────────────────── */}
                     <AnimatePresence mode="wait">
                       {form.type === 'programada' && (
                         <motion.div
@@ -414,7 +457,7 @@ export const ChallengeModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: 
                       )}
                     </AnimatePresence>
 
-                    {/* Previsualización de la hora programada / estimada */}
+                    {/* ETA */}
                     {form.pickup && form.delivery && (
                       <div className="text-xs font-semibold text-muted-foreground flex items-center gap-2 bg-default-100 p-3.5 rounded-2xl border border-divider">
                         <Clock className="w-4 h-4 text-primary animate-pulse" />
@@ -425,11 +468,12 @@ export const ChallengeModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: 
                       </div>
                     )}
 
-                    {/* ── Resumen de Costos ─────────────────────────────── */}
+                    {/* ── Resumen de Costos ─────────────────────────── */}
                     <motion.div
                       layout
-                      className="p-5 bg-primary/5 rounded-2xl border border-primary/10 relative overflow-hidden"
+                      className="p-5 bg-primary/5 rounded-2xl border border-primary/10 relative overflow-hidden space-y-4"
                     >
+                      {/* Overlay calculando */}
                       <AnimatePresence>
                         {calculating && (
                           <motion.div
@@ -439,11 +483,12 @@ export const ChallengeModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: 
                             className="absolute inset-0 bg-background/70 backdrop-blur-[2px] z-10 flex items-center justify-center gap-2 rounded-2xl"
                           >
                             <Loader2 className="w-5 h-5 animate-spin text-primary" />
-                            <span className="text-xs font-bold text-primary uppercase tracking-widest">Calculando...</span>
+                            <span className="text-xs font-bold text-primary uppercase tracking-widest">Calculando ruta real...</span>
                           </motion.div>
                         )}
                       </AnimatePresence>
 
+                      {/* Totales */}
                       <div className="flex justify-between items-end">
                         <div className="space-y-0.5">
                           <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Costo de Carrera</span>
@@ -458,18 +503,105 @@ export const ChallengeModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: 
                           <span className="text-[10px] text-muted-foreground">puntos</span>
                         </div>
                       </div>
+
+                      {/* Estadísticas de ruta */}
+                      {pricingDetails && (
+                        <div className="grid grid-cols-3 gap-2 pt-3 border-t border-primary/10">
+                          <div className="text-center">
+                            <p className="text-[9px] uppercase font-black text-muted-foreground">Distancia</p>
+                            <p className="text-sm font-black text-foreground">{pricingDetails.total_distance_km} km</p>
+                          </div>
+                          <div className="text-center border-x border-primary/10">
+                            <p className="text-[9px] uppercase font-black text-muted-foreground">Tramo normal</p>
+                            <p className="text-sm font-black text-foreground">{pricingDetails.normal_distance_km} km</p>
+                          </div>
+                          <div className="text-center">
+                            <p className="text-[9px] uppercase font-black text-muted-foreground">Zonas esp.</p>
+                            <p className="text-sm font-black text-primary">{pricingDetails.zones.length}</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Toggle desglose */}
+                      {pricingDetails && pricingDetails.zones.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setShowBreakdown(v => !v)}
+                          className="w-full flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-primary/70 hover:text-primary transition-colors pt-1"
+                        >
+                          <TrendingUp className="w-3 h-3" />
+                          {showBreakdown ? 'Ocultar desglose' : 'Ver desglose de zonas'}
+                          <motion.div animate={{ rotate: showBreakdown ? 180 : 0 }} transition={{ duration: 0.2 }}>
+                            <ChevronDown className="w-3 h-3" />
+                          </motion.div>
+                        </button>
+                      )}
+
+                      {/* Desglose de zonas especiales */}
+                      <AnimatePresence>
+                        {showBreakdown && pricingDetails && pricingDetails.zones.length > 0 && (
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            exit={{ opacity: 0, height: 0 }}
+                            className="overflow-hidden"
+                          >
+                            <div className="space-y-2 pt-2 border-t border-primary/10">
+                              {/* Tramo normal */}
+                              <div className="flex items-center justify-between py-2 px-3 rounded-xl bg-background/60">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-2 h-2 rounded-full bg-emerald-400" />
+                                  <span className="text-[11px] font-bold text-foreground">Tramo normal</span>
+                                </div>
+                                <div className="text-right">
+                                  <span className="text-[10px] text-muted-foreground">{pricingDetails.normal_distance_km} km × {pricingDetails.base_fee} Bs/km</span>
+                                  <p className="text-xs font-black text-foreground">{pricingDetails.normal_cost} Bs</p>
+                                </div>
+                              </div>
+
+                              {/* Zonas especiales */}
+                              {pricingDetails.zones.map((zone) => {
+                                const { label, color } = getZoneLabel(zone.extra_rate);
+                                return (
+                                  <div key={zone.zone_id} className="flex items-center justify-between py-2 px-3 rounded-xl bg-background/60 border border-orange-500/10">
+                                    <div className="flex items-center gap-2">
+                                      <AlertTriangle className={cn('w-3 h-3', color)} />
+                                      <div>
+                                        <p className="text-[11px] font-bold text-foreground">{zone.zone_name}</p>
+                                        <p className={cn('text-[9px] font-black uppercase', color)}>{label}</p>
+                                      </div>
+                                    </div>
+                                    <div className="text-right">
+                                      <span className="text-[10px] text-muted-foreground">
+                                        {zone.distance_km} km ÷ {zone.extra_rate}
+                                      </span>
+                                      <p className="text-xs font-black text-orange-400">{zone.cost} Bs</p>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+
+                              {/* Total */}
+                              <div className="flex items-center justify-between py-2.5 px-3 rounded-xl bg-primary/10 border border-primary/20 mt-1">
+                                <span className="text-xs font-black text-foreground uppercase tracking-wide">Total</span>
+                                <span className="text-sm font-black text-primary">{cityCurrency} {pricingDetails.total_delivery_fee}</span>
+                              </div>
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                     </motion.div>
 
                   </Fieldset.Group>
 
-                  {/* ── Footer Actions ────────────────────────────────── */}
+                  {/* ── Footer Actions ─────────────────────────────── */}
                   <Fieldset.Actions className="mt-0">
                     <Button
                       type="submit"
                       isDisabled={!isFormValid || loading}
                       isLoading={loading}
                       size="lg"
-                      color={isFormValid ? "primary" : "default"}
+                      color={isFormValid ? 'primary' : 'default'}
                       className="w-full h-14 font-black rounded-xl text-lg transition-all shadow-lg cursor-pointer"
                     >
                       {loading ? 'PROCESANDO...' : calculating ? 'ESPERE...' : 'CREAR CARRERA'}

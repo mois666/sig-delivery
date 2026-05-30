@@ -1,11 +1,9 @@
 import { useState, useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Polygon, useMapEvents } from 'react-leaflet';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Trash2, Save, Map as MapIcon, Palette, DollarSign, CheckCircle2, MousePointerClick } from 'lucide-react';
+import { Trash2, Save, Map as MapIcon, Palette, CheckCircle2, MousePointerClick, Gauge } from 'lucide-react';
 import {
     Button,
-    Description,
-    FieldError,
     Fieldset,
     Form,
     Input,
@@ -13,6 +11,7 @@ import {
     Modal,
     TextField,
 } from '@heroui/react';
+
 import { Zone } from '@/interfaces/zones-interface';
 import { useZoneStore } from '@/stores/zoneStore';
 import 'leaflet/dist/leaflet.css';
@@ -25,6 +24,16 @@ interface ZoneModalProps {
     cityCenter?: [number, number];
     city?: any;
 }
+
+// ─── Niveles de accesibilidad (extra_rate) ────────────────────────────────────
+const EXTRA_RATE_OPTIONS = [
+    { value: 1.0, label: 'Normal',      description: 'Zona estándar sin recargo',   color: '#22c55e', bg: 'bg-green-500/10',   border: 'border-green-500/40',   text: 'text-green-400'   },
+    { value: 0.9, label: 'Fácil',       description: 'Acceso sencillo',             color: '#84cc16', bg: 'bg-lime-500/10',     border: 'border-lime-500/40',     text: 'text-lime-400'     },
+    { value: 0.7, label: 'Media',       description: 'Dificultad moderada',         color: '#eab308', bg: 'bg-yellow-500/10',   border: 'border-yellow-500/40',   text: 'text-yellow-400'   },
+    { value: 0.5, label: 'Difícil',     description: 'Acceso complicado',           color: '#f97316', bg: 'bg-orange-500/10',   border: 'border-orange-500/40',   text: 'text-orange-400'   },
+    { value: 0.3, label: 'Muy Difícil', description: 'Zona de difícil acceso',      color: '#ef4444', bg: 'bg-red-500/10',      border: 'border-red-500/40',      text: 'text-red-400'      },
+    { value: 0.1, label: 'Extremo',     description: 'Acceso crítico o peligroso', color: '#dc2626', bg: 'bg-rose-600/10',     border: 'border-rose-600/40',     text: 'text-rose-500'     },
+] as const;
 
 const PRESET_COLORS = [
     '#3b82f6', // blue
@@ -64,7 +73,7 @@ export const ZoneModal = ({ isOpen, onClose, onSubmit, initialData, cityCenter, 
 
     const [form, setForm] = useState<Partial<Zone>>({
         name: '',
-        extra_rate: 0,
+        extra_rate: 1.0,
         color: '#f97316',
         is_active: true,
     });
@@ -84,7 +93,7 @@ export const ZoneModal = ({ isOpen, onClose, onSubmit, initialData, cityCenter, 
             } else {
                 setForm({
                     name: '',
-                    extra_rate: 0,
+                    extra_rate: 1.0,
                     color: '#f97316',
                     is_active: true,
                 });
@@ -129,7 +138,7 @@ export const ZoneModal = ({ isOpen, onClose, onSubmit, initialData, cityCenter, 
         const payload: any = {
             ...form,
             name: formData.get('name') as string,
-            extra_rate: Number(formData.get('extra_rate')),
+            extra_rate: form.extra_rate ?? 1.0,
             polygon: geojson,
         };
 
@@ -299,29 +308,95 @@ export const ZoneModal = ({ isOpen, onClose, onSubmit, initialData, cityCenter, 
                                                 <FieldError />
                                             </TextField>
 
-                                            {/* Recargo */}
-                                            <TextField
-                                                isRequired
-                                                name="extra_rate"
-                                                defaultValue={(form.extra_rate ?? 0).toString()}
-                                                validate={(value) => {
-                                                    if (isNaN(Number(value)) || Number(value) < 0)
-                                                        return 'Debe ser un número válido (≥ 0)';
-                                                    return null;
-                                                }}
-                                            >
-                                                <Label>Recargo Adicional</Label>
-                                                <Input
-                                                    type="number"
-                                                    step="0.5"
-                                                    min="0"
-                                                    placeholder="0.00"
-                                                    variant="flat"
-                                                    startContent={<DollarSign className="w-4 h-4 text-muted-foreground mr-1" />}
-                                                />
-                                                <Description>Costo extra que se suma al precio base por zona</Description>
-                                                <FieldError />
-                                            </TextField>
+                                            {/* Recargo — Selector visual de accesibilidad */}
+                                            <div className="flex flex-col gap-2">
+                                                <Label className="flex items-center gap-1.5">
+                                                    <Gauge className="w-3.5 h-3.5 text-muted-foreground" />
+                                                    Factor de Accesibilidad
+                                                </Label>
+                                                <p className="text-[10px] text-muted-foreground -mt-1">
+                                                    Un factor menor genera un recargo mayor sobre la tarifa base.
+                                                </p>
+                                                <div className="grid grid-cols-2 gap-2 mt-1">
+                                                    {EXTRA_RATE_OPTIONS.map((opt) => {
+                                                        const isSelected = form.extra_rate === opt.value;
+                                                        return (
+                                                            <motion.button
+                                                                key={opt.value}
+                                                                type="button"
+                                                                onClick={() => setForm(prev => ({ ...prev, extra_rate: opt.value }))}
+                                                                whileTap={{ scale: 0.96 }}
+                                                                whileHover={{ scale: 1.02 }}
+                                                                transition={{ type: 'spring', stiffness: 400, damping: 20 }}
+                                                                className={`relative flex items-center gap-3 px-3 py-2.5 rounded-xl border-2 transition-all duration-200 cursor-pointer text-left ${
+                                                                    isSelected
+                                                                        ? `${opt.bg} ${opt.border}`
+                                                                        : 'border-divider bg-default-50 hover:bg-default-100'
+                                                                }`}
+                                                            >
+                                                                {/* Indicador de nivel */}
+                                                                <div
+                                                                    className="w-3 h-3 rounded-full flex-shrink-0 ring-2 ring-offset-1 ring-offset-background transition-all"
+                                                                    style={{
+                                                                        backgroundColor: isSelected ? opt.color : 'transparent',
+                                                                        borderColor: opt.color,
+                                                                        borderWidth: 2,
+                                                                        ringColor: isSelected ? opt.color : 'transparent',
+                                                                    }}
+                                                                />
+                                                                <div className="flex-1 min-w-0">
+                                                                    <div className="flex items-center justify-between gap-1">
+                                                                        <span className={`text-[11px] font-black uppercase tracking-wide ${
+                                                                            isSelected ? opt.text : 'text-foreground'
+                                                                        }`}>
+                                                                            {opt.label}
+                                                                        </span>
+                                                                        <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${
+                                                                            isSelected ? `${opt.bg} ${opt.text}` : 'bg-muted text-muted-foreground'
+                                                                        }`}>
+                                                                            ×{opt.value}
+                                                                        </span>
+                                                                    </div>
+                                                                    <p className="text-[9px] text-muted-foreground mt-0.5 truncate">
+                                                                        {opt.description}
+                                                                    </p>
+                                                                </div>
+                                                                {/* Check activo */}
+                                                                <AnimatePresence>
+                                                                    {isSelected && (
+                                                                        <motion.div
+                                                                            initial={{ scale: 0, opacity: 0 }}
+                                                                            animate={{ scale: 1, opacity: 1 }}
+                                                                            exit={{ scale: 0, opacity: 0 }}
+                                                                            className="absolute top-1.5 right-1.5"
+                                                                        >
+                                                                            <CheckCircle2 className={`w-3.5 h-3.5 ${opt.text}`} />
+                                                                        </motion.div>
+                                                                    )}
+                                                                </AnimatePresence>
+                                                            </motion.button>
+                                                        );
+                                                    })}
+                                                </div>
+                                                {/* Preview del impacto en precio */}
+                                                {form.extra_rate !== undefined && (
+                                                    <motion.div
+                                                        layout
+                                                        className={`mt-1 px-4 py-2.5 rounded-xl border text-xs font-bold flex items-center gap-2 transition-all ${
+                                                            EXTRA_RATE_OPTIONS.find(o => o.value === form.extra_rate)?.bg || 'bg-muted/30'
+                                                        } ${
+                                                            EXTRA_RATE_OPTIONS.find(o => o.value === form.extra_rate)?.border || 'border-divider'
+                                                        }`}
+                                                    >
+                                                        <Gauge className={`w-3.5 h-3.5 flex-shrink-0 ${
+                                                            EXTRA_RATE_OPTIONS.find(o => o.value === form.extra_rate)?.text || 'text-muted-foreground'
+                                                        }`} />
+                                                        <span className={EXTRA_RATE_OPTIONS.find(o => o.value === form.extra_rate)?.text || 'text-muted-foreground'}>
+                                                            Factor ×{form.extra_rate} — el precio base se divide entre este factor en esta zona
+                                                        </span>
+                                                    </motion.div>
+                                                )}
+                                            </div>
 
                                             {/* Color */}
                                             <div className="flex flex-col gap-2">

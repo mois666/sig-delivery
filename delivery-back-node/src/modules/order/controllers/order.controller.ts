@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import prisma from '../../../lib/prisma';
 import axios from 'axios';
-import { PricingService } from '../services/pricing.service';
+import { PricingService, CoverageError } from '../services/pricing.service';
 
 export class OrderController {
   static async index(req: Request, res: Response) {
@@ -57,6 +57,9 @@ export class OrderController {
 
       return res.json(pricing);
     } catch (error: any) {
+      if (error instanceof CoverageError) {
+        return res.status(400).json({ message: error.message, code: 'COVERAGE_ERROR' });
+      }
       console.error('[OrderController.calculateFee]', error);
       return res.status(500).json({
         message: 'Error al calcular tarifa',
@@ -110,7 +113,10 @@ export class OrderController {
             );
 
             data.delivery_fee = pricingDetails.total_delivery_fee;
-          } catch (pricingErr) {
+          } catch (pricingErr: any) {
+            if (pricingErr instanceof CoverageError) {
+              return res.status(400).json({ message: pricingErr.message, code: 'COVERAGE_ERROR' });
+            }
             console.error('[OrderController.store] PricingService falló:', pricingErr);
             // Fallback: usar tarifa base de la ciudad
             data.delivery_fee = Number(city.base_delivery_fee);
@@ -124,7 +130,7 @@ export class OrderController {
       }
 
       // ── Puntos y duración ───────────────────────────────────────────────────
-      const totalDistanceKm = pricingDetails?.total_distance_km ?? 0;
+      const totalDistanceKm = pricingDetails?.route_distance_km ?? 0;
       data.points = Math.round(totalDistanceKm * 10);
 
       const durationSeconds  = pricingDetails?.duration_seconds ?? 0;
@@ -186,37 +192,73 @@ export class OrderController {
       };
 
       // ── Persistir orden ─────────────────────────────────────────────────────
-      const order = await prisma.order.create({
-        data: {
-          type:            data.type,
-          client_name:     data.client_name,
-          pickup:          data.pickup,
-          delivery:        data.delivery,
-          address_a:       data.address_a       || null,
-          address_b:       data.address_b       || null,
-          delivery_time:   data.delivery_time,
-          delivery_fee:    data.delivery_fee,
-          description:     data.description     || null,
-          currency:        data.currency        || 'BOB',
-          status:          data.status          || 'pending',
-          duration:        data.duration        || null,
-          points:          data.points          || 0,
-          city_id:         data.city_id,
-          address_metadata: data.address_metadata || {},
-          // Guardar snapshot del cálculo geoespacial (sin la geometría para no inflar el JSON)
-          pricing_details: pricingDetails
-            ? {
-                base_fee:           pricingDetails.base_fee,
-                total_distance_km:  pricingDetails.total_distance_km,
-                normal_distance_km: pricingDetails.normal_distance_km,
-                normal_cost:        pricingDetails.normal_cost,
-                zones:              pricingDetails.zones,
-                total_delivery_fee: pricingDetails.total_delivery_fee,
-                duration_seconds:   pricingDetails.duration_seconds,
-              }
-            : undefined,
-        },
-      });
+      // El campo route_geometry es un tipo PostGIS nativo (Unsupported en Prisma),
+      // por lo que se guarda usando SQL raw para poder pasar el WKT correctamente.
+      const routeWKT = pricingDetails?.route_geometry_wkt ?? null;
+
+      const pricingSnapshot = pricingDetails
+        ? {
+            route_distance_km:  pricingDetails.route_distance_km,
+            base_fee:           pricingDetails.base_fee,
+            normal_distance_km: pricingDetails.normal_distance_km,
+            normal_cost:        pricingDetails.normal_cost,
+            zones:              pricingDetails.zones,
+            total_delivery_fee: pricingDetails.total_delivery_fee,
+            duration_seconds:   pricingDetails.duration_seconds,
+          }
+        : null;
+
+      let order: any;
+
+      if (routeWKT) {
+        // Insertar con geometría de ruta vía SQL raw
+        const inserted = await prisma.$queryRaw<Array<{ id: number }>>`
+          INSERT INTO orders (
+            type, client_name, pickup, delivery,
+            address_a, address_b, delivery_time, delivery_fee,
+            description, currency, status, duration, points,
+            city_id, address_metadata, pricing_details,
+            route_geometry, created_at, updated_at
+          ) VALUES (
+            ${data.type}, ${data.client_name}, ${data.pickup}, ${data.delivery},
+            ${data.address_a || null}, ${data.address_b || null},
+            ${data.delivery_time}, ${Number(data.delivery_fee)},
+            ${data.description || null}, ${data.currency || 'BOB'},
+            ${data.status || 'pending'}, ${data.duration || null},
+            ${data.points || 0}, ${data.city_id},
+            ${JSON.stringify(data.address_metadata || {})}::jsonb,
+            ${pricingSnapshot ? JSON.stringify(pricingSnapshot) : null}::jsonb,
+            ST_SetSRID(ST_GeomFromText(${routeWKT}), 4326),
+            NOW(), NOW()
+          )
+          RETURNING id
+        `;
+
+        const newId = inserted[0]?.id;
+        order = await prisma.order.findUnique({ where: { id: newId } });
+      } else {
+        // Sin geometría de ruta: inserción normal con Prisma
+        order = await prisma.order.create({
+          data: {
+            type:             data.type,
+            client_name:      data.client_name,
+            pickup:           data.pickup,
+            delivery:         data.delivery,
+            address_a:        data.address_a        || null,
+            address_b:        data.address_b        || null,
+            delivery_time:    data.delivery_time,
+            delivery_fee:     data.delivery_fee,
+            description:      data.description      || null,
+            currency:         data.currency         || 'BOB',
+            status:           data.status           || 'pending',
+            duration:         data.duration         || null,
+            points:           data.points           || 0,
+            city_id:          data.city_id,
+            address_metadata: data.address_metadata || {},
+            pricing_details:  pricingSnapshot       ?? undefined,
+          },
+        });
+      }
 
       if (io) io.emit('order_published', order);
 

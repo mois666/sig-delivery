@@ -1,5 +1,5 @@
 import prisma from '../../../lib/prisma';
-import { getOSRMRoute } from '../../../lib/osrm';
+import { RoutingService } from '../../../services/routing.service';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -13,27 +13,43 @@ export interface ZoneCrossing {
 
 export interface PricingDetails {
   base_fee:            number;
-  total_distance_km:   number;
+  /** Distancia real por calles (fuente: OSRM). Equivale a route_distance_km. */
+  route_distance_km:   number;
   normal_distance_km:  number;
   normal_cost:         number;
   zones:               ZoneCrossing[];
   total_delivery_fee:  number;
   duration_seconds:    number;
   route_geometry:      GeoJSON.LineString | null;
+  /** WKT de la ruta, listo para persistir en PostGIS */
+  route_geometry_wkt:  string | null;
+}
+
+// ─── Error de cobertura ───────────────────────────────────────────────────────
+
+export class CoverageError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'CoverageError';
+  }
 }
 
 // ─── Servicio Principal ───────────────────────────────────────────────────────
 
 /**
+ * PricingService
+ *
  * Calcula la tarifa de delivery usando:
- *  1. OSRM  → ruta real (LineString) + distancia + duración
- *  2. PostGIS → intersecciones de la ruta con zonas de difícil acceso
- *  3. Fórmula oficial:
- *       normalCost = (total_km - Σ zone_km) * base_fee
+ *  1. PostGIS  → valida que origen y destino están dentro del área de cobertura
+ *  2. OSRM     → ruta real (LineString) + distancia real + duración
+ *  3. PostGIS  → intersecciones de la ruta con zonas de difícil acceso
+ *  4. Fórmula oficial:
+ *       normalCost = (route_km - Σ zone_km) * base_fee
  *       zoneCost   = Σ [ (zone_km * base_fee) / extra_rate ]
  *       total_fee  = normalCost + zoneCost
  *
  * Un extra_rate MENOR significa zona MÁS difícil → costo MAYOR.
+ * La distancia oficial del sistema proviene ÚNICAMENTE de OSRM (RoutingService).
  */
 export class PricingService {
   static async calculateDeliveryFee(
@@ -41,7 +57,7 @@ export class PricingService {
     pickupLng:   number,
     deliveryLat: number,
     deliveryLng: number,
-    cityId:      number
+    cityId:      number,
   ): Promise<PricingDetails> {
 
     // ── 1. Obtener ciudad y tarifa base ──────────────────────────────────────
@@ -50,27 +66,60 @@ export class PricingService {
 
     const base_fee = Number(city.base_delivery_fee);
 
-    // ── 2. Obtener ruta real desde OSRM ──────────────────────────────────────
-    let osrmRoute: Awaited<ReturnType<typeof getOSRMRoute>> | null = null;
-    let total_distance_km = 0;
+    // ── 2. Validar cobertura (origen y destino ∈ coverage_area) ─────────────
+    const coverageCheck = await prisma.$queryRaw<Array<{
+      pickup_covered:   boolean;
+      delivery_covered: boolean;
+    }>>`
+      SELECT
+        ST_Within(
+          ST_SetSRID(ST_MakePoint(${pickupLng}, ${pickupLat}), 4326),
+          coverage_area
+        ) AS pickup_covered,
+        ST_Within(
+          ST_SetSRID(ST_MakePoint(${deliveryLng}, ${deliveryLat}), 4326),
+          coverage_area
+        ) AS delivery_covered
+      FROM cities
+      WHERE id = ${cityId}
+      LIMIT 1
+    `;
+
+    if (coverageCheck.length > 0) {
+      const { pickup_covered, delivery_covered } = coverageCheck[0];
+      if (!pickup_covered) {
+        throw new CoverageError(
+          'El punto de recogida está fuera del área de cobertura de la ciudad.',
+        );
+      }
+      if (!delivery_covered) {
+        throw new CoverageError(
+          'El punto de entrega está fuera del área de cobertura de la ciudad.',
+        );
+      }
+    }
+
+    // ── 3. Obtener ruta real desde OSRM (vía RoutingService) ─────────────────
+    let route_distance_km = 0;
     let duration_seconds  = 0;
     let routeGeoJSON: GeoJSON.LineString | null = null;
-    let routeWKT = '';
+    let routeWKT: string | null = null;
 
     try {
-      osrmRoute = await getOSRMRoute(pickupLat, pickupLng, deliveryLat, deliveryLng);
-      total_distance_km = osrmRoute.distance_m / 1000;
-      duration_seconds  = osrmRoute.duration_s;
-      routeGeoJSON      = osrmRoute.geometry;
+      const route = await RoutingService.calculateRoute(
+        pickupLat,
+        pickupLng,
+        deliveryLat,
+        deliveryLng,
+      );
 
-      // Convertir GeoJSON LineString → WKT para PostGIS
-      const coords = routeGeoJSON.coordinates
-        .map((c: number[]) => `${c[0]} ${c[1]}`)
-        .join(', ');
-      routeWKT = `LINESTRING(${coords})`;
+      route_distance_km = route.distanceKm;
+      duration_seconds  = route.durationSeconds;
+      routeGeoJSON      = route.geometry;
+      routeWKT          = route.geometryWKT;
 
     } catch (err) {
-      console.error('[PricingService] OSRM falló, usando distancia recta PostGIS:', err);
+      console.error('[PricingService] OSRM falló, usando distancia geodésica PostGIS:', err);
 
       // Fallback: distancia geodésica punto a punto con PostGIS
       const distRes = await prisma.$queryRaw<Array<{ dist_km: number }>>`
@@ -79,12 +128,12 @@ export class PricingService {
           ST_SetSRID(ST_MakePoint(${deliveryLng}, ${deliveryLat}), 4326)::geography
         ) / 1000.0 AS dist_km
       `;
-      total_distance_km = Number(distRes[0]?.dist_km ?? 0);
-      duration_seconds  = Math.round((total_distance_km / 30) * 3600); // estimación 30 km/h
+      route_distance_km = Number(distRes[0]?.dist_km ?? 0);
+      duration_seconds  = Math.round((route_distance_km / 30) * 3600); // estimación 30 km/h
       routeWKT = `LINESTRING(${pickupLng} ${pickupLat}, ${deliveryLng} ${deliveryLat})`;
     }
 
-    // ── 3. Detectar intersecciones con zonas (PostGIS) ───────────────────────
+    // ── 4. Detectar intersecciones con zonas (PostGIS) ───────────────────────
     let zoneCrossings: Array<{
       id:         number;
       name:       string;
@@ -92,7 +141,7 @@ export class PricingService {
       km_inside:  number;
     }> = [];
 
-    if (total_distance_km > 0) {
+    if (route_distance_km > 0 && routeWKT) {
       try {
         zoneCrossings = await prisma.$queryRaw<typeof zoneCrossings>`
           SELECT
@@ -122,14 +171,14 @@ export class PricingService {
       }
     }
 
-    // ── 4. Calcular costos ───────────────────────────────────────────────────
+    // ── 5. Calcular costos ───────────────────────────────────────────────────
     const validZones = zoneCrossings.filter(z => z.km_inside > 0.001 && Number(z.extra_rate) > 0);
 
     // Cap: la suma de km en zonas no puede superar el total
     let sumZoneKm = validZones.reduce((sum, z) => sum + z.km_inside, 0);
-    sumZoneKm = Math.min(sumZoneKm, total_distance_km);
+    sumZoneKm = Math.min(sumZoneKm, route_distance_km);
 
-    const normal_distance_km = Math.max(0, total_distance_km - sumZoneKm);
+    const normal_distance_km = Math.max(0, route_distance_km - sumZoneKm);
     const normal_cost        = round2(normal_distance_km * base_fee);
 
     const zones: ZoneCrossing[] = validZones.map(z => {
@@ -149,13 +198,14 @@ export class PricingService {
 
     return {
       base_fee,
-      total_distance_km:  round2(total_distance_km),
+      route_distance_km:  round2(route_distance_km),
       normal_distance_km: round2(normal_distance_km),
       normal_cost,
       zones,
       total_delivery_fee,
       duration_seconds,
-      route_geometry: routeGeoJSON,
+      route_geometry:     routeGeoJSON,
+      route_geometry_wkt: routeWKT,
     };
   }
 }

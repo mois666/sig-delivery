@@ -113,6 +113,7 @@ model Order {
   delivery_time    DateTime @db.Timestamp
   address_metadata Json?
   pricing_details  Json? // Snapshot completo del cálculo geoespacial (OSRM + PostGIS)
+  route_geometry   Unsupported("geometry(LineString,4326)")? // Ruta real usada para el cálculo de tarifa
   delivery_fee     Decimal  @db.Decimal(10, 2)
   description      String?  @db.Text
   currency         String   @default("BOB") @db.VarChar(3)

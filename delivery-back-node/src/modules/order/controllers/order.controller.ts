@@ -183,12 +183,23 @@ export class OrderController {
         city_name,
         country_name,
         formatted_address,
-        pickup:        { lat: pickupLat,   lng: pickupLng   },
-        delivery:      { lat: deliveryLat, lng: deliveryLng },
-        address_a:     data.address_a || '',
-        address_b:     data.address_b || '',
-        delivery_time: formattedDeliveryTime,
-        delivery_fee:  data.delivery_fee,
+        pickup:              { lat: pickupLat,   lng: pickupLng   },
+        delivery:            { lat: deliveryLat, lng: deliveryLng },
+        address_a:           data.address_a || '',
+        address_b:           data.address_b || '',
+        delivery_time:       formattedDeliveryTime,
+        delivery_fee:        data.delivery_fee,
+        // ── Datos de ruta (OSRM + PricingService) ───────────────────────────
+        route_distance_km:   pricingDetails?.route_distance_km   ?? null,
+        total_distance_km:   pricingDetails?.route_distance_km   ?? null,
+        normal_distance_km:  pricingDetails?.normal_distance_km  ?? null,
+        normal_cost:         pricingDetails?.normal_cost         ?? null,
+        duration_seconds:    pricingDetails?.duration_seconds     ?? null,
+        duration:            data.duration                        || null,
+        base_fee:            pricingDetails?.base_fee             ?? null,
+        zones:               pricingDetails?.zones                ?? [],
+        total_delivery_fee:  pricingDetails?.total_delivery_fee   ?? data.delivery_fee,
+        route_geometry:      pricingDetails?.route_geometry       ?? null,
       };
 
       // ── Persistir orden ─────────────────────────────────────────────────────
@@ -199,12 +210,14 @@ export class OrderController {
       const pricingSnapshot = pricingDetails
         ? {
             route_distance_km:  pricingDetails.route_distance_km,
+            total_distance_km:  pricingDetails.route_distance_km,
             base_fee:           pricingDetails.base_fee,
             normal_distance_km: pricingDetails.normal_distance_km,
             normal_cost:        pricingDetails.normal_cost,
             zones:              pricingDetails.zones,
             total_delivery_fee: pricingDetails.total_delivery_fee,
             duration_seconds:   pricingDetails.duration_seconds,
+            route_geometry:     pricingDetails.route_geometry,
           }
         : null;
 

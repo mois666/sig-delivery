@@ -15,6 +15,7 @@ export interface PricingDetails {
   base_fee:            number;
   /** Distancia real por calles (fuente: OSRM). Equivale a route_distance_km. */
   route_distance_km:   number;
+  total_distance_km:   number;
   normal_distance_km:  number;
   normal_cost:         number;
   zones:               ZoneCrossing[];
@@ -199,6 +200,7 @@ export class PricingService {
     return {
       base_fee,
       route_distance_km:  round2(route_distance_km),
+      total_distance_km:  round2(route_distance_km),
       normal_distance_km: round2(normal_distance_km),
       normal_cost,
       zones,

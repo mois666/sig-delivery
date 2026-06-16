@@ -120,17 +120,26 @@ const AdminDashboard = () => {
               const { icon: TypeIcon, label, color } = config;
               const borderColor = order.type === 'programada' ? '#a855f7' : '#0070f0';
 
-              // Recalculo de distancia entre pickup y delivery (coordenadas backend)
+              // Distancia: preferir pricing_details (ruta real OSRM) o address_metadata
               let displayDistance = '0 km';
-              try {
-                if (order.pickup && order.delivery) {
-                  const [pLat, pLng] = order.pickup.split(',').map(Number);
-                  const [dLat, dLng] = order.delivery.split(',').map(Number);
-                  const km = calculateDistance(pLat, pLng, dLat, dLng);
-                  displayDistance = `${km} km`;
+              const routeKm = order.pricing_details?.route_distance_km
+                ?? order.pricing_details?.total_distance_km
+                ?? order.address_metadata?.route_distance_km
+                ?? order.address_metadata?.total_distance_km;
+
+              if (routeKm !== undefined && routeKm !== null) {
+                displayDistance = `${routeKm} km`;
+              } else {
+                try {
+                  if (order.pickup && order.delivery) {
+                    const [pLat, pLng] = order.pickup.split(',').map(Number);
+                    const [dLat, dLng] = order.delivery.split(',').map(Number);
+                    const km = calculateDistance(pLat, pLng, dLat, dLng);
+                    displayDistance = `${km} km`;
+                  }
+                } catch (e) {
+                  displayDistance = 'N/A';
                 }
-              } catch (e) {
-                displayDistance = 'N/A';
               }
 
               return (

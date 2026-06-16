@@ -102,6 +102,7 @@ export const getExtraRateFromBackend = async (lat: number, lng: number): Promise
 
 /**
  * Convierte coordenadas en una dirección legible (Geocoding Inverso).
+ * Usa Nominatim (OpenStreetMap) — gratuito, sin API key.
  */
 export const getAddressFromCoords = async (coords: string): Promise<string> => {
     if (!coords) return "";
@@ -110,30 +111,42 @@ export const getAddressFromCoords = async (coords: string): Promise<string> => {
 
     try {
         const response = await fetch(
-            `https://api.opencagedata.com/geocode/v1/json?q=${lat}+${lng}&key=${import.meta.env.VITE_API_KEY_GEOCODING}&language=es&no_annotations=1`
+            `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=es`,
+            {
+                headers: {
+                    // Nominatim requiere un User-Agent identificativo
+                    'User-Agent': 'DepedidosDeliveryApp/1.0 (acolque@depedidos.com)',
+                },
+            }
         );
 
-        if (!response.ok) throw new Error("Error en la petición");
+        if (!response.ok) throw new Error(`Nominatim error: ${response.status}`);
 
         const data = await response.json();
-        const result = data.results[0];
 
-        if (!result) return "Dirección no encontrada";
+        if (!data || data.error) return "Dirección no encontrada";
 
-        // Extraemos componentes específicos para una dirección de "delivery" más limpia
-        const { road, house_number, suburb, city } = result.components;
+        const addr = data.address || {};
+
+        // Construir dirección legible priorizando componentes relevantes
+        const road       = addr.road || addr.pedestrian || addr.footway || addr.path || '';
+        const houseNum   = addr.house_number ? ` #${addr.house_number}` : '';
+        const suburb     = addr.suburb || addr.neighbourhood || addr.quarter || '';
+        const city       = addr.city || addr.town || addr.village || addr.municipality || '';
 
         if (road) {
-            return `${city}, ${road}${house_number ? ' #' + house_number : ''}${suburb ? ', ' + suburb : ''}`;
+            const parts = [city, `${road}${houseNum}`, suburb].filter(Boolean);
+            return parts.join(', ');
         }
 
-        return result.formatted || "Dirección no encontrada";
+        return data.display_name || "Dirección no encontrada";
 
     } catch (error) {
         logger.error("Error en geocodificación:", error);
         return "Error al obtener dirección";
     }
 };
+
 
 /**
  * Algoritmo Ray-casting para verificar si un punto está dentro de un polígono.

@@ -61,6 +61,41 @@ const ChallengeCard = ({ order, onAccept }: ChallengeCardProps) => {
         </div>
       </div>
 
+      {/* Route Details (OSRM + Pricing) */}
+      {order.address_metadata && (
+        <div className="mb-4 pt-3 border-t border-border/50 grid grid-cols-3 gap-2 text-center text-xs">
+          <div className="bg-default-50/50 p-2 rounded-xl border border-border/20">
+            <span className="text-[9px] text-muted-foreground uppercase font-black tracking-wide block">Ruta Real</span>
+            <span className="font-bold text-foreground">
+              {order.address_metadata.total_distance_km ?? order.address_metadata.route_distance_km ?? '—'} km
+            </span>
+          </div>
+          <div className="bg-default-50/50 p-2 rounded-xl border border-border/20">
+            <span className="text-[9px] text-muted-foreground uppercase font-black tracking-wide block">Tramo Normal</span>
+            <span className="font-bold text-foreground">
+              {order.address_metadata.normal_distance_km ?? '—'} km
+            </span>
+          </div>
+          <div className="bg-default-50/50 p-2 rounded-xl border border-border/20">
+            <span className="text-[9px] text-muted-foreground uppercase font-black tracking-wide block">Zonas Esp.</span>
+            <span className="font-bold text-primary">
+              {order.address_metadata.zones?.length ?? 0}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {order.address_metadata?.zones && order.address_metadata.zones.length > 0 && (
+        <div className="mb-4 flex flex-wrap gap-1">
+          {order.address_metadata.zones.map((zone, idx) => (
+            <div key={idx} className="flex items-center gap-1 text-[9px] font-bold bg-warning/10 text-warning px-2.5 py-1 rounded-full border border-warning/20">
+              <Zap className="w-2.5 h-2.5" />
+              <span>{zone.zone_name} (+{zone.cost} Bs)</span>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Rewards */}
       <div className="flex items-center gap-4 mb-4">
         <div className="flex items-center gap-2">

@@ -2,6 +2,44 @@ import { Calendar, Package } from "lucide-react";
 
 export type OrderType = 'estandar' | 'programada';
 export type OrderStatus = 'available' | 'accepted' | 'on_the_way' | 'delivered' | 'cancelled';
+
+// ─── ZoneCrossing ──────────────────────────────────────────────────────────────
+
+export interface IZoneCrossing {
+    zone_id:     number;
+    zone_name:   string;
+    distance_km: number;
+    extra_rate:  number;
+    cost:        number;
+}
+
+// ─── Address Metadata ─────────────────────────────────────────────────────────
+
+export interface IAddressMetadata {
+    city_name:          string;
+    country_name:       string;
+    formatted_address:  string;
+    pickup:             { lat: number; lng: number };
+    delivery:           { lat: number; lng: number };
+    address_a:          string;
+    address_b:          string;
+    delivery_time:      string;
+    delivery_fee:       number;
+    // Datos de ruta (OSRM + PricingService)
+    route_distance_km:  number | null;
+    total_distance_km:  number | null;
+    normal_distance_km: number | null;
+    normal_cost:        number | null;
+    duration_seconds:   number | null;
+    duration:           string | null;
+    base_fee:           number | null;
+    zones:              IZoneCrossing[];
+    total_delivery_fee: number | null;
+    route_geometry:     any | null;
+}
+
+// ─── IOrder (legacy) ──────────────────────────────────────────────────────────
+
 export interface IOrder {
     id: string;
     type: OrderType;
@@ -16,7 +54,7 @@ export interface IOrder {
     delivery_time: string;
     address_a?: string | null;
     address_b?: string | null;
-    address_metadata?: any;
+    address_metadata?: IAddressMetadata;
     expiresAt: Date;
     status: OrderStatus;
     assignedTo?: string;
@@ -24,24 +62,38 @@ export interface IOrder {
     acceptedAt?: Date;
     completedAt?: Date;
 }
+
 export type IOrderType = 'estandar' | 'programada';
 export const orderTypeConfig: Record<IOrderType, { icon: any; label: string; color: string }> = {
-    estandar: { icon: Package, label: 'Estándar', color: 'text-success' },
+    estandar:   { icon: Package,  label: 'Estándar',  color: 'text-success' },
     programada: { icon: Calendar, label: 'Programada', color: 'text-primary' },
 };
+
+// ─── IAddOrder ────────────────────────────────────────────────────────────────
+
 export interface IAddOrder {
     id: string;
-    type: 'estandar' | 'programada';
-    client_name: string;
-    description: string;
-    pickup: string;            // Dirección de recogida
-    delivery: string;          // Dirección de entrega
-    address_a?: string | null; // Punto de recogida dirección manual
-    address_b?: string | null; // Punto de entrega dirección manual
+    type:          'estandar' | 'programada';
+    client_name:   string;
+    description:   string;
+    pickup:        string;   // "lat,lng"
+    delivery:      string;   // "lat,lng"
+    address_a?:    string | null;
+    address_b?:    string | null;
     delivery_time: string;
-    delivery_fee: number;
-    currency: string;
-    status: string;
-    duration: string;
-    points: number;
+    delivery_fee:  number;
+    currency:      string;
+    status:        string;
+    duration:      string;
+    points:        number;
+    address_metadata?: IAddressMetadata;
+    pricing_details?:  {
+        route_distance_km:  number;
+        base_fee:           number;
+        normal_distance_km: number;
+        normal_cost:        number;
+        zones:              IZoneCrossing[];
+        total_delivery_fee: number;
+        duration_seconds:   number;
+    } | null;
 }

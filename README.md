@@ -10,7 +10,7 @@ Antes de comenzar, asegúrate de tener instalado lo siguiente en tu máquina:
 
 - [Node.js](https://nodejs.org/) (Versión 18 o superior recomendada)
 - [npm](https://www.npmjs.com/) (incluido con Node.js) o [Bun](https://bun.sh/) (opcional, soportado en el frontend)
-- [Docker](https://www.docker.com/) y **Docker Compose** (necesarios para levantar las bases de datos de MySQL y Redis de forma sencilla)
+- [Docker](https://www.docker.com/) y **Docker Compose** (necesarios para levantar las bases de datos de PostgreSQL/PostGIS y Redis de forma sencilla)
 - [Git](https://git-scm.com/) (para control de versiones)
 
 ---
@@ -26,7 +26,7 @@ El proyecto está dividido en dos directorios principales:
 
 ## 1. ⚙️ Configuración del Backend (`delivery-back-node`)
 
-El backend requiere una base de datos MySQL y una instancia de Redis. La forma más sencilla de levantarlos es utilizando Docker.
+El backend requiere una base de datos PostgreSQL (con soporte PostGIS) y una instancia de Redis. La forma más sencilla de levantarlos es utilizando Docker.
 
 ### Pasos para la instalación:
 
@@ -45,13 +45,13 @@ El backend requiere una base de datos MySQL y una instancia de Redis. La forma m
    Copy-Item .env.example .env
    ```
 
-3. **Levantar contenedores de Base de Datos (MySQL y Redis):**
+3. **Levantar contenedores de Base de Datos (PostgreSQL y Redis):**
    Asegúrate de tener Docker abierto y ejecuta:
    ```bash
    docker-compose up -d
    ```
    Esto creará y levantará dos servicios en segundo plano:
-   - **MySQL** en el puerto `3307`
+   - **PostgreSQL (PostGIS)** en el puerto `5432`
    - **Redis** en el puerto `6379`
 
 4. **Instalar dependencias del proyecto:**
@@ -60,7 +60,7 @@ El backend requiere una base de datos MySQL y una instancia de Redis. La forma m
    ```
 
 5. **Sincronizar y generar la Base de Datos:**
-   Sincroniza el esquema de Prisma con MySQL y genera el cliente de Prisma ejecutando:
+   Sincroniza el esquema de Prisma con PostgreSQL y genera el cliente de Prisma ejecutando:
    ```bash
    # Sincronizar esquema de base de datos
    npx prisma db push
@@ -105,10 +105,10 @@ Si necesitas administrar los contenedores de base de datos, usa estos comandos d
 
 ### 🗄️ Credenciales por Defecto de la Base de Datos
 
-Si quieres conectarte a la base de datos local usando un gestor externo (como DBeaver, TablePlus, VS Code MySQL, etc.):
+Si quieres conectarte a la base de datos local usando un gestor externo (como DBeaver, TablePlus, pgAdmin, etc.):
 - **Host:** `localhost`
-- **Puerto:** `3307`
-- **Usuario:** `admin` (o `root` con contraseña `root`)
+- **Puerto:** `5432`
+- **Usuario:** `admin`
 - **Contraseña:** `admin123`
 - **Nombre de la base de datos:** `delivery_app`
 
@@ -127,18 +127,19 @@ El frontend está desarrollado con Vite y React y se comunica directamente con e
    ```
 
 2. **Crear archivo de configuración de entorno:**
-   Copia el archivo de plantilla `.env,example` o verifica que tengas tu `.env` listo:
+   Copia el archivo de plantilla `.env.example` o verifica que tengas tu `.env` listo:
    ```bash
-   cp .env,example .env
+   cp .env.example .env
    ```
-   *(Nota: En Windows PowerShell, usa: `Copy-Item .env,example .env`)*
+   *(Nota: En Windows PowerShell, usa: `Copy-Item .env.example .env`)*
 
    Asegúrate de que tu archivo `.env` tenga las variables configuradas de la siguiente manera para apuntar al backend local:
    ```env
    VITE_API_URL=http://localhost:4000/api
    VITE_SOCKET_URL=http://localhost:4000
-   VITE_API_KEY_GEOCODING=b07354c00c4e4ebca58287e315d1afeb
-   VITE_GOOGLE_MAPS_API_KEY=AIzaSyDD6YYOAFypgXEmn6qyCdx_ua5k58ZRUkI
+   VITE_GOOGLE_MAPS_API_KEY=AfdgsfgEmn6qyCdx_ua5k58ZRUkI
+   VITE_NAME_APP=DEPEDIDOS
+   VITE_NAME_SUPPORT=support@depedidos.com
    ```
 
 3. **Instalar dependencias del proyecto:**
@@ -174,9 +175,9 @@ Para trabajar en el proyecto a diario, te recomendamos seguir este flujo:
 2. Abre dos terminales independientes en tu editor (o dos pestañas):
    - **Terminal 1 (Backend):**
      ```bash
-     cd delivery-back-node
-     docker-compose up -d  # Asegura que MySQL y Redis estén corriendo
-     npm run dev
+      cd delivery-back-node
+      docker-compose up -d  # Asegura que PostgreSQL y Redis estén corriendo
+      npm run dev
      ```
    - **Terminal 2 (Frontend):**
      ```bash

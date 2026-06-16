@@ -136,8 +136,11 @@ export const AdminOrders = () => {
                     const { icon: TypeIcon, label, color } = config;
                     const borderColor = order.type === 'programada' ? '#a855f7' : '#0070f0';
 
-                    // Distancia: preferir pricing_details (ruta real OSRM)
-                    const km = order.pricing_details?.total_distance_km
+                    // Distancia: preferir pricing_details (ruta real OSRM) o address_metadata
+                    const km = order.pricing_details?.route_distance_km
+                        ?? order.pricing_details?.total_distance_km
+                        ?? order.address_metadata?.route_distance_km
+                        ?? order.address_metadata?.total_distance_km
                         ?? (() => {
                             try {
                                 const [pLat, pLng] = order.pickup.split(',').map(Number);

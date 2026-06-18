@@ -108,6 +108,36 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT || 4000;
+
+// ─── Cron: Expirar reservas pre-assigned cada 30 segundos ─────────────────────
+setInterval(async () => {
+  try {
+    const expired = await prisma.order.findMany({
+      where: {
+        status: 'pre-assigned',
+        reservation_expires_at: { lt: new Date() },
+      },
+    });
+
+    for (const order of expired) {
+      await prisma.order.update({
+        where: { id: order.id },
+        data: {
+          status: 'active',
+          reserved_driver_id: null,
+          reserved_at: null,
+          reservation_expires_at: null,
+        },
+      });
+      io.emit('order_reservation_expired', { order_id: order.id });
+      io.emit('order_activated', { ...order, status: 'active' });
+      console.log(`[Cron] Reserva expirada para order #${order.id}`);
+    }
+  } catch (err) {
+    console.error('[Cron] Error al expirar reservas:', err);
+  }
+}, 30_000);
+
 server.listen(PORT, () => {
   console.log(`Servidor de Delivery corriendo en puerto ${PORT}`);
 });

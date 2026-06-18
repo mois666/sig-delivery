@@ -116,9 +116,9 @@ const ChallengeCard = ({ order, onAccept }: ChallengeCardProps) => {
           </div>
           <div>
             <div className="text-lg font-bold text-foreground">
-              {order.points}
-              {order.points > 0 && (
-                <span className="text-accent text-sm ml-1">+{order.points}</span>
+              {order.reward_points}
+              {order.reward_points > 0 && (
+                <span className="text-accent text-sm ml-1">+{order.reward_points}</span>
               )}
             </div>
             <div className="text-[10px] text-muted-foreground uppercase">Puntos</div>

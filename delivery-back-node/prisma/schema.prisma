@@ -103,27 +103,32 @@ model User {
 // ─── Pedidos ──────────────────────────────────────────────────────────────────
 
 model Order {
-  id               Int      @id @default(autoincrement())
-  type             String // ej: 'delivery', 'express'
-  client_name      String   @db.VarChar(100)
-  pickup           String // Dirección de recogida
-  delivery         String // Dirección de entrega
-  address_a        String?  @db.Text
-  address_b        String?  @db.Text
-  delivery_time    DateTime @db.Timestamp
-  address_metadata Json?
-  pricing_details  Json? // Snapshot completo del cálculo geoespacial (OSRM + PostGIS)
-  route_geometry   Unsupported("geometry(LineString,4326)")? // Ruta real usada para el cálculo de tarifa
-  delivery_fee     Decimal  @db.Decimal(10, 2)
-  description      String?  @db.Text
-  currency         String   @default("BOB") @db.VarChar(3)
-  status           String   @default("pending") @db.VarChar(30)
-  duration         String?  @db.VarChar(30)
-  points           Int      @default(0)
-  city_id          Int      @default(1)
-  city             City     @relation(fields: [city_id], references: [id])
-  created_at       DateTime @default(now())
-  updated_at       DateTime @updatedAt
+  id                      Int       @id @default(autoincrement())
+  type                    String // ej: 'delivery', 'express'
+  client_name             String    @db.VarChar(100)
+  pickup                  String // Dirección de recogida
+  delivery                String // Dirección de entrega
+  address_a               String?   @db.Text
+  address_b               String?   @db.Text
+  delivery_time           DateTime  @db.Timestamp
+  address_metadata        Json?
+  pricing_details         Json? // Snapshot completo del cálculo geoespacial (OSRM + PostGIS)
+  route_geometry          Unsupported("geometry(LineString,4326)")? // Ruta real usada para el cálculo de tarifa
+  delivery_fee            Decimal   @db.Decimal(10, 2)
+  description             String?   @db.Text
+  currency                String    @default("BOB") @db.VarChar(3)
+  status                  String    @default("pending") @db.VarChar(30)
+  duration                String?   @db.VarChar(30)
+  reward_points           Int       @default(0)
+  // ─── Reserva pre-assigned ─────────────────────────────────────────────
+  reserved_driver_id      Int?      // ID del driver que reservó
+  reserved_at             DateTime? // Cuándo se realizó la reserva
+  reservation_expires_at  DateTime? // Cuándo expira (reserved_at + 5 min)
+  // ─────────────────────────────────────────────────────────────────────
+  city_id                 Int       @default(1)
+  city                    City      @relation(fields: [city_id], references: [id])
+  created_at              DateTime  @default(now())
+  updated_at              DateTime  @updatedAt
 
   assignments OrderAssignment[]
 

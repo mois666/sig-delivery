@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Package, MapPin, Star, Trash2, Clock, Info, ChevronDown, Navigation, Gauge } from 'lucide-react';
+import { Plus, Package, MapPin, Star, Trash2, Clock, Info, ChevronDown, Navigation, Gauge, Edit, Play } from 'lucide-react';
 import { Button } from '@heroui/react';
 import { useOrderStore } from '@/stores/orderStore';
 import { ChallengeModal } from '@/components/modals/ChallengeModal';
+import { EditOrderModal } from '@/components/modals/EditOrderModal';
 
 import { orderTypeConfig } from '@/interfaces/orders-interface';
 import { getAddressFromCoords } from '@/lib/geoUtils';
@@ -13,12 +14,12 @@ import { cn } from '@/lib/utils';
 
 /** Devuelve etiqueta y color según el extra_rate de una zona */
 const getZoneBadge = (rate: number): { label: string; color: string; bg: string } => {
-    if (rate >= 1.0) return { label: 'Normal',       color: 'text-green-400',  bg: 'bg-green-500/10'  };
-    if (rate >= 0.8) return { label: 'Fácil',         color: 'text-lime-400',   bg: 'bg-lime-500/10'   };
-    if (rate >= 0.6) return { label: 'Media',          color: 'text-yellow-400', bg: 'bg-yellow-500/10' };
-    if (rate >= 0.4) return { label: 'Difícil',        color: 'text-orange-400', bg: 'bg-orange-500/10' };
-    if (rate >= 0.2) return { label: 'Muy difícil',    color: 'text-red-400',    bg: 'bg-red-500/10'    };
-    return                   { label: 'Extremo',        color: 'text-rose-500',   bg: 'bg-rose-600/10'   };
+    if (rate >= 1.0) return { label: 'Normal', color: 'text-green-400', bg: 'bg-green-500/10' };
+    if (rate >= 0.8) return { label: 'Fácil', color: 'text-lime-400', bg: 'bg-lime-500/10' };
+    if (rate >= 0.6) return { label: 'Media', color: 'text-yellow-400', bg: 'bg-yellow-500/10' };
+    if (rate >= 0.4) return { label: 'Difícil', color: 'text-orange-400', bg: 'bg-orange-500/10' };
+    if (rate >= 0.2) return { label: 'Muy difícil', color: 'text-red-400', bg: 'bg-red-500/10' };
+    return { label: 'Extremo', color: 'text-rose-500', bg: 'bg-rose-600/10' };
 };
 
 /** Formatea fecha/hora desde string o Date */
@@ -92,8 +93,10 @@ const PricingBreakdown = ({ pricing, currency }: { pricing: any; currency: strin
 // ─── Página Principal ─────────────────────────────────────────────────────────
 
 export const AdminOrders = () => {
-    const { orders, fetchOrders, removeOrder, isLoading } = useOrderStore();
+    const { orders, fetchOrders, removeOrder, updateOrderStatus, isLoading } = useOrderStore();
     const [showModal, setShowModal] = useState(false);
+    const [editModalOpen, setEditModalOpen] = useState(false);
+    const [editingOrder, setEditingOrder] = useState<any>(null);
     const [expandedId, setExpandedId] = useState<number | null>(null);
 
     useEffect(() => {
@@ -104,6 +107,17 @@ export const AdminOrders = () => {
         if (window.confirm('¿Deseas cancelar esta orden permanentemente?')) {
             await removeOrder(id);
         }
+    };
+
+    const handleActivate = async (id: string) => {
+        if (window.confirm('¿Deseas activar esta orden?')) {
+            await updateOrderStatus(id, 'active');
+        }
+    };
+
+    const handleEdit = (order: any) => {
+        setEditingOrder(order);
+        setEditModalOpen(true);
     };
 
     const toggleExpand = (id: number) =>
@@ -132,7 +146,7 @@ export const AdminOrders = () => {
             {/* Lista de Órdenes */}
             <div className="px-4 space-y-4">
                 {orders.map((order: any, index: number) => {
-                    const config      = orderTypeConfig[order.type] || orderTypeConfig.estandar;
+                    const config = orderTypeConfig[order.type] || orderTypeConfig.estandar;
                     const { icon: TypeIcon, label, color } = config;
                     const borderColor = order.type === 'programada' ? '#a855f7' : '#0070f0';
 
@@ -154,11 +168,11 @@ export const AdminOrders = () => {
                         })();
 
                     // Dirección: preferir address_metadata o address_a/b
-                    const pickupAddr   = order.address_a || order.address_metadata?.address_a || null;
+                    const pickupAddr = order.address_a || order.address_metadata?.address_a || null;
                     const deliveryAddr = order.address_b || order.address_metadata?.address_b || null;
 
-                    const hasPricing  = !!order.pricing_details;
-                    const isExpanded  = expandedId === order.id;
+                    const hasPricing = !!order.pricing_details;
+                    const isExpanded = expandedId === order.id;
 
                     return (
                         <motion.div
@@ -203,13 +217,31 @@ export const AdminOrders = () => {
                                         </div>
                                     </div>
                                 </div>
-                                <Button
-                                    variant="ghost" size="icon"
-                                    className="text-muted-foreground hover:text-destructive hover:bg-destructive/5 rounded-full cursor-pointer"
-                                    onClick={() => handleDelete(order.id)}
-                                >
-                                    <Trash2 className="w-4 h-4" />
-                                </Button>
+                                <div className="flex items-center gap-1">
+                                    {order.status === 'pending' && (
+                                        <Button
+                                            variant="ghost" size="icon"
+                                            className="text-success hover:text-success hover:bg-success/10 rounded-full cursor-pointer"
+                                            onClick={() => handleActivate(order.id.toString())}
+                                        >
+                                            <Play className="w-4 h-4" />
+                                        </Button>
+                                    )}
+                                    <Button
+                                        variant="ghost" size="icon"
+                                        className="text-primary hover:text-primary hover:bg-primary/10 rounded-full cursor-pointer"
+                                        onClick={() => handleEdit(order)}
+                                    >
+                                        <Edit className="w-4 h-4" />
+                                    </Button>
+                                    <Button
+                                        variant="ghost" size="icon"
+                                        className="text-muted-foreground hover:text-destructive hover:bg-destructive/5 rounded-full cursor-pointer"
+                                        onClick={() => handleDelete(order.id)}
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                </div>
                             </div>
 
                             {/* ── Ruta Visual ───────────────────────────────── */}
@@ -262,7 +294,7 @@ export const AdminOrders = () => {
                                 <div className="flex flex-col text-right">
                                     <span className="text-[8px] uppercase font-black text-muted-foreground">Recompensa</span>
                                     <span className="text-sm font-black text-accent font-display flex items-center justify-end gap-1">
-                                        <Star className="w-3 h-3 fill-accent" /> {order.points}
+                                        <Star className="w-3 h-3 fill-accent" /> {order.reward_points ?? 0}
                                     </span>
                                 </div>
                             </div>
@@ -307,6 +339,14 @@ export const AdminOrders = () => {
                 <ChallengeModal
                     isOpen={showModal}
                     onClose={() => setShowModal(false)}
+                />
+                <EditOrderModal
+                    isOpen={editModalOpen}
+                    onClose={() => {
+                        setEditModalOpen(false);
+                        setEditingOrder(null);
+                    }}
+                    order={editingOrder}
                 />
             </AnimatePresence>
         </div>

@@ -209,7 +209,7 @@ const AdminDashboard = () => {
                         <span className="text-[8px] uppercase font-bold text-muted-foreground">Puntos</span>
                         <div className="flex items-center gap-0.5 font-black text-accent">
                           <Star className="w-3 h-3 fill-accent" />
-                          <span className="text-sm">{order.points}</span>
+                          <span className="text-sm">{order.reward_points ?? 0}</span>
                         </div>
                       </div>
                       {/* Distancia */}
@@ -282,13 +282,13 @@ const AdminDashboard = () => {
 
       <AnimatePresence>
         {/* Modal para Nueva Carrera */}
-        <ChallengeModal 
-          isOpen={showCreateModal} 
-          onClose={() => setShowCreateModal(false)} 
+        <ChallengeModal
+          isOpen={showCreateModal}
+          onClose={() => setShowCreateModal(false)}
         />
       </AnimatePresence>
 
-      
+
     </div>
   );
 };

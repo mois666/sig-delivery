@@ -121,7 +121,7 @@ export const ChallengeModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: 
     currency:      cityCurrency,
     status:        'pending',
     duration:      '0 min',
-    points:        0,
+    reward_points: 0,
   });
 
   // ── Calcular precio desde el backend ────────────────────────────────────────
@@ -148,7 +148,7 @@ export const ChallengeModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: 
         ...prev,
         delivery_fee:  data.total_delivery_fee,
         duration:      `${durationMinutes} minutos`,
-        points:        Math.round(data.total_distance_km * 10),
+        reward_points: Math.round(data.total_distance_km * 10),
         currency:      cityCurrency,
         delivery_time: prev.type === 'estandar'
           ? formatDateTime(estimatedDate)
@@ -247,6 +247,11 @@ export const ChallengeModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: 
     if (!name || name.length < 3) return;
 
     setLoading(true);
+    const durationMins = parseInt(form.duration) || 0;
+    const h = Math.floor(durationMins / 60).toString().padStart(2, '0');
+    const m = (durationMins % 60).toString().padStart(2, '0');
+    const dbDuration = `${h}:${m}:00`;
+
     const payload = {
       type:          form.type,
       client_name:   name,
@@ -258,8 +263,8 @@ export const ChallengeModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: 
       delivery_fee:  form.delivery_fee,
       currency:      form.currency,
       status:        form.status,
-      duration:      form.duration,
-      points:        form.points,
+      duration:      dbDuration,
+      reward_points: form.reward_points,
       delivery_time: form.delivery_time || formatDateTime(new Date()),
       city_id:       cityId,
     };
@@ -499,7 +504,7 @@ export const ChallengeModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: 
                         </div>
                         <div className="text-right space-y-0.5">
                           <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Recompensa</span>
-                          <div className="text-3xl font-display font-black text-primary">{form.points}</div>
+                          <div className="text-3xl font-display font-black text-primary">{form.reward_points}</div>
                           <span className="text-[10px] text-muted-foreground">puntos</span>
                         </div>
                       </div>

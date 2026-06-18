@@ -1,211 +1,340 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { MapPin, Clock, User, Phone, ChevronRight, CheckCircle, Star } from 'lucide-react';
-import { Button } from '@heroui/react';
-import { useOrderStore, OrderStatus } from '@/stores/orderStore';
-import { useWalletStore } from '@/stores/walletStore';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  MapPin, Clock, User, Phone, ChevronRight, CheckCircle,
+  Star, XCircle, Package, Bike, AlertTriangle, DollarSign
+} from 'lucide-react';
+import { Button, Chip } from '@heroui/react';
+import { useOrderStore } from '@/stores/orderStore';
 import { useAuthStore } from '@/stores/authStore';
 import StatusTimeline from '@/components/StatusTimeline';
-
 import { toast } from 'sonner';
 
-const statusMessages: Record<OrderStatus, string> = {
-  pending: 'Pendiente',
-  active: 'Activo',
-  'pre-assigned': 'Pre-asignado',
-  assigned: 'Asignado',
-  canceled: 'Cancelado',
-  collected: 'Recogido / Prepara la entrega',
-  running: 'En camino al destino',
-  arrived: 'Llegó al punto de entrega',
-  delivered: 'Entrega completada',
-  'not-delivered': 'No entregado',
-  // legacy compatibility:
-  available: 'Disponible',
-  accepted: 'Aceptado',
-  on_the_way: 'En camino',
-  cancelled: 'Cancelado',
+// ─── Etiquetas de estado ───────────────────────────────────────────────────────
+const statusMessages: Record<string, { label: string; color: string }> = {
+  collected:      { label: 'Recogido — Prepara la entrega', color: 'text-primary' },
+  running:        { label: 'En camino al destino', color: 'text-warning' },
+  arrived:        { label: 'Llegaste al punto de entrega', color: 'text-success' },
+  delivered:      { label: '¡Entrega completada!', color: 'text-success' },
+  'not-delivered': { label: 'No se pudo entregar', color: 'text-destructive' },
+  // Fallbacks
+  pending:        { label: 'Pendiente', color: 'text-muted-foreground' },
+  active:         { label: 'Disponible', color: 'text-primary' },
+  assigned:       { label: 'Asignado', color: 'text-primary' },
 };
 
+// ─── Componente ───────────────────────────────────────────────────────────────
 const ActiveDelivery = () => {
   const navigate = useNavigate();
   const { activeOrder, updateOrderStatus, completeOrder } = useOrderStore();
-  const { addTransaction, updateBalance, updatePoints } = useWalletStore();
-  const { updateUser, user } = useAuthStore();
-  const [isCompleting, setIsCompleting] = useState(false);
+  const { user, updateUser } = useAuthStore();
+  const [isLoading, setIsLoading] = useState(false);
+  const [showNotDeliveredConfirm, setShowNotDeliveredConfirm] = useState(false);
 
   if (!activeOrder) {
     navigate('/home');
     return null;
   }
 
-  const handleUpdateStatus = () => {
-    if (activeOrder.status === 'collected' || activeOrder.status === 'accepted') {
-      const nextStatus = activeOrder.status === 'accepted' ? 'on_the_way' : 'running';
-      updateOrderStatus(activeOrder.id, nextStatus as any);
-      toast.success('¡En camino!', { description: 'El cliente ha sido notificado' });
-    } else if (activeOrder.status === 'running') {
-      updateOrderStatus(activeOrder.id, 'arrived');
-      toast.success('¡Llegaste!', { description: 'Has marcado tu llegada' });
-    } else if (activeOrder.status === 'arrived' || activeOrder.status === 'on_the_way') {
-      handleComplete();
+  const currentStatus = activeOrder.status;
+  const statusInfo = statusMessages[currentStatus] ?? { label: currentStatus, color: 'text-muted-foreground' };
+  const rewardPts = (activeOrder as any).reward_points ?? (activeOrder as any).points ?? 0;
+
+  // ─── Handlers ─────────────────────────────────────────────────────────────
+  const handleUpdateStatus = async (nextStatus: string) => {
+    setIsLoading(true);
+    try {
+      await updateOrderStatus(activeOrder.id, nextStatus);
+      const labels: Record<string, string> = {
+        running:  '¡En camino! El cliente fue notificado.',
+        arrived:  '¡Llegaste! Confirma la entrega cuando estés listo.',
+      };
+      if (labels[nextStatus]) toast.success(labels[nextStatus]);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleComplete = () => {
-    setIsCompleting(true);
-    
-    // Simulate completion
-    setTimeout(() => {
-      completeOrder(activeOrder.id);
-      
-      // Add transactions
-      addTransaction({
-        type: 'earning',
-        amount: activeOrder.fee,
-        description: `Entrega completada - ${activeOrder.zone}`,
-        orderId: activeOrder.id,
-      });
-
-      const totalPoints = activeOrder.points + activeOrder.bonusPoints;
-      addTransaction({
-        type: 'points',
-        amount: totalPoints,
-        description: `Puntos por entrega ${activeOrder.type}`,
-        orderId: activeOrder.id,
-      });
-
-      // Update user points
+  const handleComplete = async () => {
+    setIsLoading(true);
+    try {
+      await completeOrder(activeOrder.id);
+      // Actualizar puntos localmente (el backend también lo hace)
       if (user) {
-        updateUser({ totalPoints: user.totalPoints + totalPoints });
+        updateUser({ totalPoints: (user.totalPoints ?? 0) + rewardPts });
       }
-
       toast.success('🎉 ¡Entrega completada!', {
-        description: `+Bs ${activeOrder.fee} y +${totalPoints} puntos`,
+        description: `+Bs ${Number((activeOrder as any).delivery_fee ?? 0).toFixed(2)} y +${rewardPts} puntos`,
       });
-
       navigate('/home');
-    }, 1500);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const getButtonText = () => {
-    if (isCompleting) return 'Completando...';
-    if (activeOrder.status === 'collected' || activeOrder.status === 'accepted') return 'Iniciar Entrega';
-    if (activeOrder.status === 'running') return 'Marcar Llegada';
-    if (activeOrder.status === 'arrived' || activeOrder.status === 'on_the_way') return 'Marcar como Entregado';
-    return 'Continuar';
+  const handleNotDelivered = async () => {
+    setIsLoading(true);
+    try {
+      await updateOrderStatus(activeOrder.id, 'not-delivered');
+      toast.warning('Pedido marcado como no entregado.', {
+        description: 'El administrador será notificado.',
+      });
+      navigate('/home');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // ─── Botones dinámicos ─────────────────────────────────────────────────────
+  const getActions = () => {
+    switch (currentStatus) {
+      case 'collected':
+        return (
+          <Button
+            color="primary"
+            className="w-full h-14 text-base font-bold rounded-2xl touch-target"
+            onClick={() => handleUpdateStatus('running')}
+            isLoading={isLoading}
+            endContent={!isLoading && <Bike className="w-5 h-5 ml-1" />}
+          >
+            Salí a Entregar
+          </Button>
+        );
+
+      case 'running':
+        return (
+          <Button
+            color="warning"
+            className="w-full h-14 text-base font-bold rounded-2xl touch-target"
+            onClick={() => handleUpdateStatus('arrived')}
+            isLoading={isLoading}
+            endContent={!isLoading && <MapPin className="w-5 h-5 ml-1" />}
+          >
+            Llegué al Destino
+          </Button>
+        );
+
+      case 'arrived':
+        return (
+          <div className="flex gap-3">
+            <Button
+              color="danger"
+              variant="flat"
+              className="flex-1 h-14 font-bold rounded-2xl"
+              onClick={() => setShowNotDeliveredConfirm(true)}
+              isDisabled={isLoading}
+              startContent={<XCircle className="w-4 h-4" />}
+            >
+              No Entregué
+            </Button>
+            <Button
+              color="success"
+              className="flex-[1.6] h-14 font-bold rounded-2xl shadow-lg shadow-success/20"
+              onClick={handleComplete}
+              isLoading={isLoading}
+              startContent={!isLoading && <CheckCircle className="w-5 h-5" />}
+            >
+              Entregar
+            </Button>
+          </div>
+        );
+
+      case 'delivered':
+      case 'not-delivered':
+        return (
+          <Button
+            color="primary"
+            variant="flat"
+            className="w-full h-14 font-bold rounded-2xl"
+            onClick={() => navigate('/home')}
+          >
+            Volver al inicio
+          </Button>
+        );
+
+      default:
+        return null;
+    }
   };
 
   return (
-    <div className="min-h-screen bg-background pb-24 safe-top">
+    <div className="min-h-screen bg-background pb-32 safe-top">
+
       {/* Header */}
-      <div className="glass-card border-b border-border/50 px-4 py-6">
+      <div className="glass-card border-b border-border/50 px-4 py-5">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <p className="text-sm text-muted-foreground">Entrega activa</p>
+            <p className="text-xs text-muted-foreground uppercase font-bold mb-0.5">Entrega activa</p>
             <h2 className="text-xl font-display font-bold text-foreground">
-              #{activeOrder.id.slice(0, 8).toUpperCase()}
+              #{String(activeOrder.id).slice(-6).toUpperCase()}
             </h2>
           </div>
-          <div className="flex items-center gap-4">
-            <div className="text-right">
-              <div className="flex items-center gap-1 text-accent">
-                <span className="font-bold text-lg">Bs {activeOrder.fee}</span>
+          <div className="text-right space-y-1">
+            <Chip
+              color="success"
+              variant="flat"
+              size="lg"
+              startContent={<DollarSign className="w-3 h-3" />}
+              className="font-bold text-base"
+            >
+              Bs {Number((activeOrder as any).delivery_fee ?? 0).toFixed(2)}
+            </Chip>
+            {rewardPts > 0 && (
+              <div className="flex items-center justify-end gap-1 text-sm text-warning">
+                <Star className="w-3.5 h-3.5" />
+                <span className="font-bold">+{rewardPts} pts</span>
               </div>
-              <div className="flex items-center gap-1 text-sm text-primary">
-                <Star className="w-3 h-3" />
-                <span>+{activeOrder.points + activeOrder.bonusPoints} pts</span>
-              </div>
-            </div>
+            )}
           </div>
         </div>
 
-        {/* Status */}
+        {/* Estado actual */}
         <motion.div
-          key={activeOrder.status}
-          initial={{ opacity: 0, y: -10 }}
+          key={currentStatus}
+          initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-center py-3 rounded-xl bg-primary/10 border border-primary/20"
+          className="text-center py-3 rounded-2xl bg-primary/8 border border-primary/15"
         >
-          <p className="text-primary font-semibold">{statusMessages[activeOrder.status]}</p>
+          <p className={`font-bold text-sm ${statusInfo.color}`}>{statusInfo.label}</p>
         </motion.div>
       </div>
 
       {/* Timeline */}
-      <div className="px-4 py-6">
-        <StatusTimeline currentStatus={activeOrder.status} />
+      <div className="px-4 py-5">
+        <StatusTimeline currentStatus={currentStatus as any} />
       </div>
 
-      {/* Delivery Details */}
+      {/* Detalles */}
       <div className="px-4 space-y-4">
-        {/* Customer */}
+
+        {/* Cliente */}
         <div className="glass-card p-4">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center">
-              <User className="w-6 h-6 text-primary" />
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-full bg-primary/15 flex items-center justify-center">
+              <User className="w-5 h-5 text-primary" />
             </div>
-            <div>
-              <p className="font-semibold text-foreground">{activeOrder.customerName}</p>
-              <p className="text-sm text-muted-foreground">{activeOrder.zone}</p>
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-foreground truncate">
+                {(activeOrder as any).client_name || (activeOrder as any).customerName || 'Cliente'}
+              </p>
+              <p className="text-xs text-muted-foreground">Pedido #{String(activeOrder.id).slice(-6).toUpperCase()}</p>
             </div>
-            <Button variant="outline" size="icon" className="ml-auto rounded-full">
+            <Button variant="flat" size="sm" isIconOnly className="rounded-full">
               <Phone className="w-4 h-4" />
             </Button>
           </div>
         </div>
 
-        {/* Locations */}
+        {/* Ruta */}
         <div className="glass-card p-4 space-y-4">
           <div className="flex gap-3">
-            <div className="flex flex-col items-center">
-              <div className="w-3 h-3 rounded-full bg-success" />
-              <div className="w-0.5 h-12 bg-border" />
-              <div className="w-3 h-3 rounded-full bg-primary" />
+            <div className="flex flex-col items-center gap-1 pt-1">
+              <div className="w-3 h-3 rounded-full bg-success border-2 border-success/30" />
+              <div className="w-0.5 flex-1 bg-border min-h-[32px]" />
+              <div className="w-3 h-3 rounded-full bg-primary border-2 border-primary/30" />
             </div>
-            <div className="flex-1 space-y-4">
+            <div className="flex-1 space-y-4 min-w-0">
               <div>
-                <p className="text-xs text-muted-foreground uppercase mb-1">Recoger en</p>
-                <p className="font-medium text-foreground">{activeOrder.pickupAddress}</p>
+                <p className="text-[10px] text-muted-foreground uppercase font-bold mb-0.5">Recoger en</p>
+                <p className="font-medium text-foreground text-sm leading-snug">
+                  {(activeOrder as any).address_a || (activeOrder as any).pickup || (activeOrder as any).pickupAddress}
+                </p>
               </div>
               <div>
-                <p className="text-xs text-muted-foreground uppercase mb-1">Entregar en</p>
-                <p className="font-medium text-foreground">{activeOrder.deliveryAddress}</p>
+                <p className="text-[10px] text-muted-foreground uppercase font-bold mb-0.5">Entregar en</p>
+                <p className="font-medium text-foreground text-sm leading-snug">
+                  {(activeOrder as any).address_b || (activeOrder as any).delivery || (activeOrder as any).deliveryAddress}
+                </p>
               </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-4 pt-2 border-t border-border/50">
-            <div className="flex items-center gap-2 text-muted-foreground">
+          <div className="flex items-center gap-4 pt-3 border-t border-border/40">
+            <div className="flex items-center gap-1.5 text-muted-foreground">
               <MapPin className="w-4 h-4" />
-              <span className="text-sm">{activeOrder.distance}</span>
+              <span className="text-xs font-medium">
+                {(activeOrder as any).address_metadata?.total_distance_km
+                  ? `${(activeOrder as any).address_metadata.total_distance_km} km`
+                  : (activeOrder as any).distance || '—'}
+              </span>
             </div>
-            <div className="flex items-center gap-2 text-muted-foreground">
+            <div className="flex items-center gap-1.5 text-muted-foreground">
               <Clock className="w-4 h-4" />
-              <span className="text-sm">~15 min</span>
+              <span className="text-xs font-medium">
+                {(activeOrder as any).duration || '~15 min'}
+              </span>
             </div>
           </div>
         </div>
+
+        {/* Descripción si existe */}
+        {(activeOrder as any).description && (
+          <div className="glass-card p-4 rounded-2xl">
+            <div className="flex items-center gap-2 mb-2">
+              <Package className="w-4 h-4 text-primary" />
+              <p className="text-xs font-bold uppercase text-muted-foreground">Descripción</p>
+            </div>
+            <p className="text-sm text-foreground leading-relaxed">{(activeOrder as any).description}</p>
+          </div>
+        )}
       </div>
 
-      {/* Action Button */}
+      {/* Botón de acción fijo */}
       <div className="fixed bottom-20 left-4 right-4 z-30">
-        <Button
-          onClick={handleUpdateStatus}
-          disabled={isCompleting || activeOrder.status === 'delivered'}
-          color={activeOrder.status === 'running' || activeOrder.status === 'on_the_way' ? 'warning' : 'primary'}
-          className="w-full h-14 text-lg font-bold rounded-xl touch-target"
-        >
-          {activeOrder.status === 'arrived' || activeOrder.status === 'on_the_way' ? (
-            <CheckCircle className="w-5 h-5 mr-2" />
-          ) : (
-            <ChevronRight className="w-5 h-5 mr-2" />
-          )}
-          <span>{getButtonText()}</span>
-        </Button>
+        {getActions()}
       </div>
 
-      
+      {/* ─── Modal de confirmación: No entregado ───────────────────────────────── */}
+      <AnimatePresence>
+        {showNotDeliveredConfirm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-end justify-center"
+            style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }}
+          >
+            <motion.div
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 28 }}
+              className="w-full max-w-md bg-background rounded-t-3xl p-6 pb-10"
+            >
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-11 h-11 rounded-full bg-destructive/15 flex items-center justify-center">
+                  <AlertTriangle className="w-5 h-5 text-destructive" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-foreground">¿No pudiste entregar?</h3>
+                  <p className="text-sm text-muted-foreground">El pedido quedará registrado como no entregado.</p>
+                </div>
+              </div>
+              <div className="flex gap-3 mt-6">
+                <Button
+                  variant="flat"
+                  className="flex-1 font-bold"
+                  onClick={() => setShowNotDeliveredConfirm(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  color="danger"
+                  className="flex-1 font-bold"
+                  onClick={() => {
+                    setShowNotDeliveredConfirm(false);
+                    handleNotDelivered();
+                  }}
+                  isLoading={isLoading}
+                >
+                  Confirmar
+                </Button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

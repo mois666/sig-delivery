@@ -1,7 +1,23 @@
 import { Calendar, Package } from "lucide-react";
 
 export type OrderType = 'estandar' | 'programada';
-export type OrderStatus = 'available' | 'accepted' | 'on_the_way' | 'delivered' | 'cancelled';
+export type OrderStatus = 'pending' | 'active' | 'pre-assigned' | 'assigned' | 'canceled' | 'collected' | 'running' | 'arrived' | 'delivered' | 'not-delivered' | 'available' | 'accepted' | 'on_the_way' | 'cancelled';
+
+export interface IOrderAssignment {
+    id: number;
+    order_id: number;
+    user_id: number;
+    status: string;
+    status_metadata: {
+        collected_at?: string | null;
+        running_at?: string | null;
+        arrived_at?: string | null;
+        delivered_at?: string | null;
+        'not-delivered_at'?: string | null;
+    } | null;
+    created_at: string;
+    updated_at: string;
+}
 
 // ─── ZoneCrossing ──────────────────────────────────────────────────────────────
 
@@ -61,6 +77,7 @@ export interface IOrder {
     createdAt: Date;
     acceptedAt?: Date;
     completedAt?: Date;
+    assignments?: IOrderAssignment[];
 }
 
 export type IOrderType = 'estandar' | 'programada';

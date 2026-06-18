@@ -53,14 +53,14 @@ io.on('connection', (socket) => {
     try {
       const { order_id, user_id } = data;
 
-      const result = await prisma.$transaction(async (tx: any) => {
+      await prisma.$transaction(async (tx: any) => {
         const order = await tx.order.findUnique({ where: { id: order_id } });
 
-        if (!order || order.status !== 'pending') {
+        if (!order || !['pending', 'active', 'pre-assigned'].includes(order.status)) {
           throw new Error('El pedido ya no está disponible');
         }
 
-        const updatedOrder = await tx.order.update({
+        await tx.order.update({
           where: { id: order_id },
           data: { status: 'assigned' }
         });
@@ -69,15 +69,31 @@ io.on('connection', (socket) => {
           data: {
             order_id,
             user_id,
-            status: 'accepted'
+            status: 'collected',
+            status_metadata: {
+              collected_at: new Date(),
+              running_at: null,
+              arrived_at: null,
+              delivered_at: null,
+              'not-delivered_at': null
+            }
           }
         });
+      });
 
-        return updatedOrder;
+      // Fetch the updated order including its assignments to emit
+      const finalOrder = await prisma.order.findUnique({
+        where: { id: order_id },
+        include: {
+          assignments: {
+            orderBy: { created_at: 'desc' },
+            take: 1
+          }
+        }
       });
 
       console.log(`Pedido ${order_id} aceptado por driver ${user_id}`);
-      io.emit('order_assigned', result);
+      io.emit('order_assigned', finalOrder);
       socket.emit('order_accepted_confirm', { success: true });
 
     } catch (error: any) {

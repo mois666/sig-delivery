@@ -8,15 +8,20 @@ interface StatusTimelineProps {
 }
 
 const steps = [
-  { status: 'accepted', label: 'Aceptado', icon: CheckCircle2 },
-  { status: 'on_the_way', label: 'En camino', icon: Truck },
+  { status: 'collected', label: 'Recogido', icon: CheckCircle2 },
+  { status: 'running', label: 'En camino', icon: Truck },
+  { status: 'arrived', label: 'En el punto', icon: CheckCircle2 },
   { status: 'delivered', label: 'Entregado', icon: Package },
 ];
 
-const statusOrder: OrderStatus[] = ['accepted', 'on_the_way', 'delivered'];
+const statusOrder: OrderStatus[] = ['collected', 'running', 'arrived', 'delivered'];
 
 const StatusTimeline = ({ currentStatus }: StatusTimelineProps) => {
-  const currentIndex = statusOrder.indexOf(currentStatus);
+  let resolvedStatus = currentStatus;
+  if (currentStatus === 'accepted') resolvedStatus = 'collected';
+  if (currentStatus === 'on_the_way') resolvedStatus = 'running';
+
+  const currentIndex = statusOrder.indexOf(resolvedStatus);
 
   return (
     <div className="relative flex items-center justify-between px-4">

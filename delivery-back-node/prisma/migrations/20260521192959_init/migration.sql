@@ -64,9 +64,10 @@ CREATE TABLE "orders" (
     "delivery" TEXT NOT NULL,
     "address_a" TEXT,
     "address_b" TEXT,
-
     "delivery_time" TIMESTAMP(3) NOT NULL,
     "address_metadata" JSONB,
+    "pricing_details" JSONB,
+    "route_geometry" geometry(LineString,4326),
     "delivery_fee" DECIMAL(10,2) NOT NULL,
     "description" TEXT,
     "currency" VARCHAR(3) NOT NULL DEFAULT 'BOB',
@@ -86,6 +87,8 @@ CREATE TABLE "order_assignments" (
     "order_id" INTEGER NOT NULL,
     "user_id" INTEGER NOT NULL,
     "status" TEXT NOT NULL DEFAULT 'pending',
+    /* Status metadata */
+    "status_metadata" JSONB,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
 
@@ -123,10 +126,10 @@ CREATE TABLE "transactions" (
 CREATE TABLE "zones" (
     "id" SERIAL NOT NULL,
     "name" TEXT NOT NULL,
-    "extra_rate" DECIMAL(8,2) NOT NULL DEFAULT 0,
+    "extra_rate" DECIMAL(8,2) NOT NULL DEFAULT 1.0,
     "color" TEXT NOT NULL DEFAULT '#ff0000',
     "is_active" BOOLEAN NOT NULL DEFAULT true,
-    "polygon" geometry(Polygon, 4326) NOT NULL,
+    "polygon" geometry(MultiPolygon, 4326) NOT NULL,
     "city_id" INTEGER NOT NULL,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
@@ -225,6 +228,12 @@ CREATE INDEX "account_deletion_requests_status_idx" ON "account_deletion_request
 
 -- CreateIndex
 CREATE UNIQUE INDEX "app_policies_type_version_key" ON "app_policies"("type", "version");
+
+-- CreateIndex
+CREATE INDEX "idx_city_coverage" ON "cities" USING GIST ("coverage_area");
+
+-- CreateIndex
+CREATE INDEX "idx_zone_polygon" ON "zones" USING GIST ("polygon");
 
 -- AddForeignKey
 ALTER TABLE "orders" ADD CONSTRAINT "orders_city_id_fkey" FOREIGN KEY ("city_id") REFERENCES "cities"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

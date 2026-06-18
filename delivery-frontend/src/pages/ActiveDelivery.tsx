@@ -11,10 +11,20 @@ import StatusTimeline from '@/components/StatusTimeline';
 import { toast } from 'sonner';
 
 const statusMessages: Record<OrderStatus, string> = {
-  available: 'Disponible',
-  accepted: 'Prepara la entrega',
-  on_the_way: 'En camino al destino',
+  pending: 'Pendiente',
+  active: 'Activo',
+  'pre-assigned': 'Pre-asignado',
+  assigned: 'Asignado',
+  canceled: 'Cancelado',
+  collected: 'Recogido / Prepara la entrega',
+  running: 'En camino al destino',
+  arrived: 'Llegó al punto de entrega',
   delivered: 'Entrega completada',
+  'not-delivered': 'No entregado',
+  // legacy compatibility:
+  available: 'Disponible',
+  accepted: 'Aceptado',
+  on_the_way: 'En camino',
   cancelled: 'Cancelado',
 };
 
@@ -31,10 +41,14 @@ const ActiveDelivery = () => {
   }
 
   const handleUpdateStatus = () => {
-    if (activeOrder.status === 'accepted') {
-      updateOrderStatus(activeOrder.id, 'on_the_way');
+    if (activeOrder.status === 'collected' || activeOrder.status === 'accepted') {
+      const nextStatus = activeOrder.status === 'accepted' ? 'on_the_way' : 'running';
+      updateOrderStatus(activeOrder.id, nextStatus as any);
       toast.success('¡En camino!', { description: 'El cliente ha sido notificado' });
-    } else if (activeOrder.status === 'on_the_way') {
+    } else if (activeOrder.status === 'running') {
+      updateOrderStatus(activeOrder.id, 'arrived');
+      toast.success('¡Llegaste!', { description: 'Has marcado tu llegada' });
+    } else if (activeOrder.status === 'arrived' || activeOrder.status === 'on_the_way') {
       handleComplete();
     }
   };
@@ -77,8 +91,9 @@ const ActiveDelivery = () => {
 
   const getButtonText = () => {
     if (isCompleting) return 'Completando...';
-    if (activeOrder.status === 'accepted') return 'Iniciar Entrega';
-    if (activeOrder.status === 'on_the_way') return 'Marcar como Entregado';
+    if (activeOrder.status === 'collected' || activeOrder.status === 'accepted') return 'Iniciar Entrega';
+    if (activeOrder.status === 'running') return 'Marcar Llegada';
+    if (activeOrder.status === 'arrived' || activeOrder.status === 'on_the_way') return 'Marcar como Entregado';
     return 'Continuar';
   };
 
@@ -178,10 +193,10 @@ const ActiveDelivery = () => {
         <Button
           onClick={handleUpdateStatus}
           disabled={isCompleting || activeOrder.status === 'delivered'}
-          color={activeOrder.status === 'on_the_way' ? 'warning' : 'primary'}
+          color={activeOrder.status === 'running' || activeOrder.status === 'on_the_way' ? 'warning' : 'primary'}
           className="w-full h-14 text-lg font-bold rounded-xl touch-target"
         >
-          {activeOrder.status === 'on_the_way' ? (
+          {activeOrder.status === 'arrived' || activeOrder.status === 'on_the_way' ? (
             <CheckCircle className="w-5 h-5 mr-2" />
           ) : (
             <ChevronRight className="w-5 h-5 mr-2" />

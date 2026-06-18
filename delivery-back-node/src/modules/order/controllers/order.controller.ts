@@ -9,6 +9,12 @@ export class OrderController {
       const orders = await prisma.order.findMany({
         orderBy: { created_at: 'desc' },
         take: 50,
+        include: {
+          assignments: {
+            orderBy: { created_at: 'desc' },
+            take: 1,
+          },
+        },
       });
 
       return res.json({ orders });
@@ -248,7 +254,15 @@ export class OrderController {
         `;
 
         const newId = inserted[0]?.id;
-        order = await prisma.order.findUnique({ where: { id: newId } });
+        order = await prisma.order.findUnique({
+          where: { id: newId },
+          include: {
+            assignments: {
+              orderBy: { created_at: 'desc' },
+              take: 1,
+            },
+          },
+        });
       } else {
         // Sin geometría de ruta: inserción normal con Prisma
         order = await prisma.order.create({
@@ -270,6 +284,12 @@ export class OrderController {
             address_metadata: data.address_metadata || {},
             pricing_details:  pricingSnapshot       ?? undefined,
           },
+          include: {
+            assignments: {
+              orderBy: { created_at: 'desc' },
+              take: 1,
+            },
+          },
         });
       }
 
@@ -288,7 +308,15 @@ export class OrderController {
   static async show(req: Request, res: Response) {
     const id = parseInt(req.params.id as string);
     try {
-      const order = await prisma.order.findUnique({ where: { id } });
+      const order = await prisma.order.findUnique({
+        where: { id },
+        include: {
+          assignments: {
+            orderBy: { created_at: 'desc' },
+            take: 1,
+          },
+        },
+      });
       if (!order) return res.status(404).json({ message: 'Pedido no encontrado' });
       return res.json(order);
     } catch (error) {
@@ -300,7 +328,16 @@ export class OrderController {
     const id   = parseInt(req.params.id as string);
     const data = req.body;
     try {
-      const order = await prisma.order.update({ where: { id }, data });
+      const order = await prisma.order.update({
+        where: { id },
+        data,
+        include: {
+          assignments: {
+            orderBy: { created_at: 'desc' },
+            take: 1,
+          },
+        },
+      });
       return res.json({ message: 'Pedido actualizado correctamente', order });
     } catch (error) {
       return res.status(500).json({ message: 'Error al actualizar pedido' });
@@ -326,7 +363,7 @@ export class OrderController {
     try {
       const order = await prisma.$transaction(async (tx: any) => {
         const existingOrder = await tx.order.findUnique({ where: { id } });
-        if (!existingOrder || existingOrder.status !== 'pending') {
+        if (!existingOrder || !['pending', 'active', 'pre-assigned'].includes(existingOrder.status)) {
           throw new Error('El pedido ya no está disponible');
         }
         const updatedOrder = await tx.order.update({
@@ -334,13 +371,34 @@ export class OrderController {
           data:  { status: 'assigned' },
         });
         await tx.orderAssignment.create({
-          data: { order_id: id, user_id: parseInt(driver_id), status: 'accepted' },
+          data: {
+            order_id: id,
+            user_id: parseInt(driver_id),
+            status: 'collected',
+            status_metadata: {
+              collected_at: new Date(),
+              running_at: null,
+              arrived_at: null,
+              delivered_at: null,
+              'not-delivered_at': null
+            }
+          },
         });
         return updatedOrder;
       });
 
-      if (io) io.emit('order_assigned', order);
-      return res.json(order);
+      const finalOrder = await prisma.order.findUnique({
+        where: { id },
+        include: {
+          assignments: {
+            orderBy: { created_at: 'desc' },
+            take: 1
+          }
+        }
+      });
+
+      if (io) io.emit('order_assigned', finalOrder);
+      return res.json(finalOrder);
     } catch (error: any) {
       return res.status(400).json({ message: error.message || 'Error al aceptar pedido' });
     }
@@ -351,10 +409,106 @@ export class OrderController {
     const { status } = req.body;
     const io = (req as any).io;
     try {
-      const order = await prisma.order.update({ where: { id }, data: { status } });
-      if (io) io.emit('order_updated', order);
-      return res.json(order);
+      const existingOrder = await prisma.order.findUnique({
+        where: { id },
+        include: {
+          assignments: {
+            orderBy: { created_at: 'desc' },
+            take: 1
+          }
+        }
+      });
+
+      if (!existingOrder) {
+        return res.status(404).json({ message: 'Pedido no encontrado' });
+      }
+
+      let updatedOrder: any;
+
+      if (existingOrder.status === 'assigned') {
+        const latestAssignment = existingOrder.assignments[0];
+        if (!latestAssignment) {
+          return res.status(400).json({ message: 'No se encontró una asignación activa para este pedido' });
+        }
+
+        const assignmentStatuses = ['collected', 'running', 'arrived', 'delivered', 'not-delivered'];
+        if (!assignmentStatuses.includes(status)) {
+          if (status === 'canceled') {
+            updatedOrder = await prisma.order.update({
+              where: { id },
+              data: { status: 'canceled' },
+              include: {
+                assignments: {
+                  orderBy: { created_at: 'desc' },
+                  take: 1
+                }
+              }
+            });
+            if (io) io.emit('order_updated', updatedOrder);
+            return res.json(updatedOrder);
+          }
+          return res.status(400).json({ message: 'Estado de asignación no válido' });
+        }
+
+        let currentMetadata: any = latestAssignment.status_metadata;
+        if (typeof currentMetadata === 'string') {
+          try {
+            currentMetadata = JSON.parse(currentMetadata);
+          } catch {
+            currentMetadata = {};
+          }
+        } else if (!currentMetadata || typeof currentMetadata !== 'object') {
+          currentMetadata = {};
+        }
+
+        const newMetadata = {
+          collected_at: currentMetadata.collected_at || null,
+          running_at: currentMetadata.running_at || null,
+          arrived_at: currentMetadata.arrived_at || null,
+          delivered_at: currentMetadata.delivered_at || null,
+          'not-delivered_at': currentMetadata['not-delivered_at'] || null,
+          [`${status}_at`]: new Date()
+        };
+
+        await prisma.orderAssignment.update({
+          where: { id: latestAssignment.id },
+          data: {
+            status,
+            status_metadata: newMetadata
+          }
+        });
+
+        updatedOrder = await prisma.order.findUnique({
+          where: { id },
+          include: {
+            assignments: {
+              orderBy: { created_at: 'desc' },
+              take: 1
+            }
+          }
+        });
+      } else {
+        const orderStatuses = ['pending', 'active', 'pre-assigned', 'assigned', 'canceled'];
+        if (!orderStatuses.includes(status)) {
+          return res.status(400).json({ message: 'Estado de pedido no válido' });
+        }
+
+        updatedOrder = await prisma.order.update({
+          where: { id },
+          data: { status },
+          include: {
+            assignments: {
+              orderBy: { created_at: 'desc' },
+              take: 1
+            }
+          }
+        });
+      }
+
+      if (io) io.emit('order_updated', updatedOrder);
+      return res.json(updatedOrder);
     } catch (error) {
+      console.error('[OrderController.updateStatus] error:', error);
       return res.status(500).json({ message: 'Error al actualizar estado del pedido' });
     }
   }
@@ -363,10 +517,79 @@ export class OrderController {
     const id = parseInt(req.params.id as string);
     const io = (req as any).io;
     try {
-      const order = await prisma.order.update({ where: { id }, data: { status: 'completed' } });
-      if (io) io.emit('order_completed', order);
-      return res.json(order);
+      const existingOrder = await prisma.order.findUnique({
+        where: { id },
+        include: {
+          assignments: {
+            orderBy: { created_at: 'desc' },
+            take: 1
+          }
+        }
+      });
+
+      if (!existingOrder) {
+        return res.status(404).json({ message: 'Pedido no encontrado' });
+      }
+
+      let updatedOrder: any;
+
+      if (existingOrder.status === 'assigned') {
+        const latestAssignment = existingOrder.assignments[0];
+        if (latestAssignment) {
+          let currentMetadata: any = latestAssignment.status_metadata;
+          if (typeof currentMetadata === 'string') {
+            try {
+              currentMetadata = JSON.parse(currentMetadata);
+            } catch {
+              currentMetadata = {};
+            }
+          } else if (!currentMetadata || typeof currentMetadata !== 'object') {
+            currentMetadata = {};
+          }
+
+          const newMetadata = {
+            collected_at: currentMetadata.collected_at || null,
+            running_at: currentMetadata.running_at || null,
+            arrived_at: currentMetadata.arrived_at || null,
+            delivered_at: new Date(),
+            'not-delivered_at': currentMetadata['not-delivered_at'] || null
+          };
+
+          await prisma.orderAssignment.update({
+            where: { id: latestAssignment.id },
+            data: {
+              status: 'delivered',
+              status_metadata: newMetadata
+            }
+          });
+        }
+
+        updatedOrder = await prisma.order.findUnique({
+          where: { id },
+          include: {
+            assignments: {
+              orderBy: { created_at: 'desc' },
+              take: 1
+            }
+          }
+        });
+      } else {
+        updatedOrder = await prisma.order.update({
+          where: { id },
+          data: { status: 'assigned' },
+          include: {
+            assignments: {
+              orderBy: { created_at: 'desc' },
+              take: 1
+            }
+          }
+        });
+      }
+
+      if (io) io.emit('order_completed', updatedOrder);
+      return res.json(updatedOrder);
     } catch (error) {
+      console.error('[OrderController.complete] error:', error);
       return res.status(500).json({ message: 'Error al finalizar pedido' });
     }
   }

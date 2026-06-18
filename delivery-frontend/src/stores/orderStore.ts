@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import { IOrder, OrderStatus, IAddOrder } from '@/interfaces/orders-interface';
+import { IOrder, IAddOrder } from '@/interfaces/orders-interface';
+export type { OrderStatus } from '@/interfaces/orders-interface';
 import { appDB } from '@/api/appDB';
 import axios from 'axios';
 import { toast } from 'sonner';
@@ -23,6 +24,17 @@ interface OrderState {
   removeOrderLocally: (orderId: string) => void;
 }
 
+const resolveOrder = (order: any): any => {
+  if (!order) return null;
+  if (order.status === 'assigned' && order.assignments && order.assignments.length > 0) {
+    return {
+      ...order,
+      status: order.assignments[0].status,
+    };
+  }
+  return order;
+};
+
 export const useOrderStore = create<OrderState>((set, get) => ({
   orders: [],
   availableOrders: [],
@@ -37,11 +49,10 @@ export const useOrderStore = create<OrderState>((set, get) => ({
     set({ isLoading: true });
     try {
       const { data } = await appDB.get("/orders");
-      // Filtramos por estado según la lógica de negocio
-      //const filteredOrders = data.orders.filter(order => order.status === OrderStatus.PENDIENTE);
+      const mappedOrders = (data.orders || []).map(resolveOrder);
       set({
-        orders: data.orders,
-        availableOrders: data.orders,
+        orders: mappedOrders,
+        availableOrders: mappedOrders.filter((o: any) => ['pending', 'active', 'pre-assigned'].includes(o.status)),
         isLoading: false
       });
     } catch (error) {
@@ -60,8 +71,9 @@ export const useOrderStore = create<OrderState>((set, get) => ({
       const user = useAuthStore.getState().user;
       const city_id = user?.city?.id ?? 1;
       const { data } = await appDB.post<IAddOrder>('/orders', { ...orderData, city_id });
+      const resolvedData = resolveOrder(data);
       set((state) => ({
-        availableOrders: [data, ...state.availableOrders],
+        availableOrders: [resolvedData, ...state.availableOrders],
       }));
       await get().fetchOrders();
       toast.success("¡Carrera publicada!");
@@ -80,9 +92,10 @@ export const useOrderStore = create<OrderState>((set, get) => ({
   acceptOrder: async (orderId: string, driverId: string) => {
     try {
       const { data } = await appDB.put<IOrder>(`/orders/${orderId}/accept`, { driver_id: driverId });
+      const resolvedData = resolveOrder(data);
       set((state) => ({
         availableOrders: state.availableOrders.filter((o) => o.id !== orderId),
-        activeOrder: data,
+        activeOrder: resolvedData,
       }));
       toast.success("Pedido aceptado");
     } catch (error) {
@@ -96,8 +109,9 @@ export const useOrderStore = create<OrderState>((set, get) => ({
   updateOrderStatus: async (orderId: string, status: OrderStatus) => {
     try {
       const { data } = await appDB.patch<IOrder>(`/orders/${orderId}/status`, { status });
+      const resolvedData = resolveOrder(data);
       set((state) => ({
-        activeOrder: state.activeOrder?.id === orderId ? data : state.activeOrder,
+        activeOrder: state.activeOrder?.id === orderId ? resolvedData : state.activeOrder,
       }));
     } catch (error) {
       toast.error("Error al actualizar estado");
@@ -110,9 +124,10 @@ export const useOrderStore = create<OrderState>((set, get) => ({
   completeOrder: async (orderId: string) => {
     try {
       const { data } = await appDB.patch<IOrder>(`/orders/${orderId}/complete`);
+      const resolvedData = resolveOrder(data);
       set((state) => ({
         activeOrder: null,
-        completedOrders: [data, ...state.completedOrders],
+        completedOrders: [resolvedData, ...state.completedOrders],
       }));
       toast.success("¡Entrega completada!");
     } catch (error) {
@@ -141,11 +156,12 @@ export const useOrderStore = create<OrderState>((set, get) => ({
       const exists = state.availableOrders.some((o: any) => o.id === newOrder.id);
       if (exists) return state;
 
+      const resolved = resolveOrder(newOrder);
       return {
         ...state,
-        availableOrders: [newOrder, ...state.availableOrders],
+        availableOrders: [resolved, ...state.availableOrders],
         // También actualizamos la lista general si es necesario
-        orders: [newOrder, ...state.orders]
+        orders: [resolved, ...state.orders]
       };
     });
   },

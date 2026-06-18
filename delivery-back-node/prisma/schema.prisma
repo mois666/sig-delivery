@@ -136,7 +136,8 @@ model OrderAssignment {
   id         Int      @id @default(autoincrement())
   order_id   Int
   user_id    Int
-  status     String   @default("pending") // pending, accepted, rejected, completed
+  status     String   @default("collected") // collected, running, arrived, delivered, not-delivered
+  status_metadata Json?
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 

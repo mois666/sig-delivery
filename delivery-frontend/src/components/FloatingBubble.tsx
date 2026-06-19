@@ -1,28 +1,51 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
-import { motion, useMotionValue, useSpring, PanInfo } from 'framer-motion';
-import { Bike, Package, Timer } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { motion, useMotionValue, PanInfo, animate } from 'framer-motion';
+import { Bike, Package } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
-type BubbleMode = 'pre-assigned' | 'active';
+type BubbleMode = 'pre-assigned' | 'assigned';
 
 interface Props {
   mode: BubbleMode;
-  /** ISO string de cuando expira la reserva (solo modo pre-assigned) */
+  /** ISO string de cuando expira la reserva (modo pre-assigned o inicio de carrera) */
   expiresAt?: string | null;
-  /** Duración estimada de la carrera en texto (ej: "25 min") */
+  /** Duración estimada de la carrera (ej: "00:15:00" o "25 min") */
   duration?: string | null;
   onClick: () => void;
   /** Fuerza la posición inicial (bottom-right por defecto) */
   initialSide?: 'left' | 'right';
+  /** Determina si es visible */
+  visible?: boolean;
 }
+
+// Helper to parse duration string (HH:MM:SS or e.g., "25 min") to seconds
+const parseDurationToSeconds = (durationStr: string | null | undefined): number => {
+  if (!durationStr) return 0;
+  const parts = durationStr.split(':');
+  if (parts.length === 3) {
+    const hh = parseInt(parts[0], 10) || 0;
+    const mm = parseInt(parts[1], 10) || 0;
+    const ss = parseInt(parts[2], 10) || 0;
+    return hh * 3600 + mm * 60 + ss;
+  }
+  const match = durationStr.match(/(\d+)/);
+  if (match) {
+    return parseInt(match[0], 10) * 60;
+  }
+  return 15 * 60; // 15 minutes default fallback
+};
 
 // ─── Countdown hook ────────────────────────────────────────────────────────────
 const useCountdown = (expiresAt: string | null | undefined) => {
   const [remaining, setRemaining] = useState<number>(0);
 
   useEffect(() => {
-    if (!expiresAt) { setRemaining(0); return; }
+    if (!expiresAt) {
+      setRemaining(0);
+      return;
+    }
 
     const update = () => {
       const diff = new Date(expiresAt).getTime() - Date.now();
@@ -34,9 +57,15 @@ const useCountdown = (expiresAt: string | null | undefined) => {
     return () => clearInterval(interval);
   }, [expiresAt]);
 
-  const mm = String(Math.floor(remaining / 60)).padStart(2, '0');
-  const ss = String(remaining % 60).padStart(2, '0');
-  return { formatted: `${mm}:${ss}`, seconds: remaining };
+  const hh = Math.floor(remaining / 3600);
+  const mm = Math.floor((remaining % 3600) / 60);
+  const ss = remaining % 60;
+
+  const formatted = hh > 0
+    ? `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`
+    : `${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
+
+  return { formatted, seconds: remaining };
 };
 
 // ─── Componente ───────────────────────────────────────────────────────────────
@@ -46,7 +75,10 @@ export const FloatingBubble = ({
   duration,
   onClick,
   initialSide = 'right',
+  visible = true,
 }: Props) => {
+  if (!visible) return null;
+
   const BUBBLE_SIZE = 72;
   const EDGE_MARGIN = 16;
 
@@ -55,55 +87,98 @@ export const FloatingBubble = ({
 
   const { formatted: countdown, seconds } = useCountdown(expiresAt);
 
-  // Color del anillo basado en el tiempo restante
+  // Position motion values for custom drag-to-edge animation with physics
+  const x = useMotionValue(
+    initialSide === 'right'
+      ? window.innerWidth - BUBBLE_SIZE - EDGE_MARGIN
+      : EDGE_MARGIN
+  );
+  const y = useMotionValue(window.innerHeight * 0.35);
+
+  // Handle window resizing
+  useEffect(() => {
+    const handleResize = () => {
+      const vw = window.innerWidth;
+      const currentX = x.get();
+      if (currentX > vw / 2) {
+        x.set(vw - BUBBLE_SIZE - EDGE_MARGIN);
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [x, BUBBLE_SIZE, EDGE_MARGIN]);
+
+  // Color del anillo
   const getRingColor = () => {
     if (mode === 'pre-assigned') {
       if (seconds < 60) return 'hsl(0 72% 51%)'; // rojo urgente
       if (seconds < 120) return 'hsl(25 95% 53%)'; // naranja
       return 'hsl(217 91% 60%)'; // azul
     }
-    return 'hsl(142 71% 45%)'; // verde para active
+    return 'hsl(0 72% 51%)'; // Rojo para modo assigned (en curso)
   };
 
   const ringColor = getRingColor();
 
-  // Progreso del anillo (para modo pre-assigned)
-  const totalSecs = 5 * 60; // 5 minutos
-  const progress = mode === 'pre-assigned'
+  // Progreso del anillo
+  const totalSecs = mode === 'pre-assigned'
+    ? 5 * 60
+    : parseDurationToSeconds(duration);
+
+  const progress = totalSecs > 0
     ? (seconds / totalSecs) * 100
     : 100;
 
-  const circumference = 2 * Math.PI * 30; // radio 30
-  const strokeDash = (progress / 100) * circumference;
+  const circumference = 2 * Math.PI * 34; // radio 34
 
-  return (
+  return createPortal(
     <>
       {/* Overlay para limitar el drag */}
-      <div ref={constraintsRef} className="fixed inset-0 pointer-events-none z-40" />
+      <div ref={constraintsRef} className="fixed inset-0 pointer-events-none z-[9999]" />
 
       <motion.div
         drag
         dragConstraints={constraintsRef}
         dragElastic={0.15}
-        dragMomentum={false}
+        dragMomentum={true}
         onDragStart={() => setDragging(true)}
         onDragEnd={(_, info: PanInfo) => {
           setDragging(false);
-          // Snap al borde más cercano
           const vw = window.innerWidth;
           const vh = window.innerHeight;
-          const el = constraintsRef.current?.getBoundingClientRect();
-          if (!el) return;
+
+          const currentX = x.get();
+          const currentY = y.get();
+
+          // Snap al borde izquierdo o derecho basado en la posición + velocidad
+          const targetX = currentX + info.velocity.x * 0.15 < vw / 2
+            ? EDGE_MARGIN
+            : vw - BUBBLE_SIZE - EDGE_MARGIN;
+
+          // Limitar Y dentro del viewport
+          const targetY = Math.max(
+            EDGE_MARGIN,
+            Math.min(vh - BUBBLE_SIZE - EDGE_MARGIN - 80, currentY + info.velocity.y * 0.15)
+          );
+
+          // Animar con física de resorte (bounce)
+          animate(x, targetX, { type: 'spring', stiffness: 200, damping: 15 });
+          animate(y, targetY, { type: 'spring', stiffness: 200, damping: 15 });
         }}
-        initial={{
-          x: initialSide === 'right'
-            ? window.innerWidth - BUBBLE_SIZE - EDGE_MARGIN * 2
-            : EDGE_MARGIN,
-          y: window.innerHeight * 0.35,
+        onClick={() => {
+          if (!dragging) onClick();
         }}
-        whileDrag={{ scale: 1.08 }}
-        onClick={() => { if (!dragging) onClick(); }}
-        style={{ position: 'fixed', zIndex: 50, cursor: 'grab', userSelect: 'none', touchAction: 'none' }}
+        style={{
+          x,
+          y,
+          position: 'fixed',
+          left: 0,
+          top: 0,
+          zIndex: 9999,
+          cursor: dragging ? 'grabbing' : 'grab',
+          userSelect: 'none',
+          touchAction: 'none'
+        }}
       >
         {/* Anillo SVG de progreso */}
         <svg
@@ -116,12 +191,14 @@ export const FloatingBubble = ({
           <circle cx="38" cy="38" r="34" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="4" />
           {/* Progress */}
           <circle
-            cx="38" cy="38" r="34"
+            cx="38"
+            cy="38"
+            r="34"
             fill="none"
             stroke={ringColor}
             strokeWidth="4"
             strokeLinecap="round"
-            strokeDasharray={`${(progress / 100) * (2 * Math.PI * 34)} ${2 * Math.PI * 34}`}
+            strokeDasharray={`${(progress / 100) * circumference} ${circumference}`}
             strokeDashoffset={0}
             transform="rotate(-90 38 38)"
             style={{ transition: 'stroke-dasharray 1s linear, stroke 0.5s ease' }}
@@ -139,26 +216,28 @@ export const FloatingBubble = ({
             height: BUBBLE_SIZE,
             background: mode === 'pre-assigned'
               ? 'linear-gradient(135deg, hsl(217 91% 40%), hsl(250 80% 35%))'
-              : 'linear-gradient(135deg, hsl(142 71% 30%), hsl(162 60% 25%))',
+              : 'linear-gradient(135deg, hsl(0 72% 35%), hsl(340 80% 30%))',
             boxShadow: `0 8px 32px ${ringColor}55, 0 2px 8px rgba(0,0,0,0.4)`,
           }}
           animate={{
-            scale: [1, 1.04, 1],
-            boxShadow: [
-              `0 8px 32px ${ringColor}55`,
-              `0 8px 40px ${ringColor}88`,
-              `0 8px 32px ${ringColor}55`,
-            ],
+            scale: dragging ? 1.08 : [1, 1.04, 1],
+            boxShadow: dragging
+              ? `0 12px 40px ${ringColor}77`
+              : [
+                  `0 8px 32px ${ringColor}55`,
+                  `0 8px 40px ${ringColor}88`,
+                  `0 8px 32px ${ringColor}55`,
+                ],
           }}
-          transition={{ repeat: Infinity, duration: 2.5, ease: 'easeInOut' }}
+          transition={dragging ? { duration: 0.1 } : { repeat: Infinity, duration: 2.5, ease: 'easeInOut' }}
         >
           {/* Ícono */}
           {mode === 'pre-assigned' ? (
             <Bike className="w-6 h-6 text-white mb-0.5" />
           ) : (
-            <div className="flex items-center gap-0.5">
+            <div className="flex items-center gap-0.5 mb-0.5">
               <Bike className="w-5 h-5 text-white" />
-              <Package className="w-3.5 h-3.5 text-white/70" />
+              <Package className="w-3.5 h-3.5 text-white/80" />
             </div>
           )}
 
@@ -167,23 +246,24 @@ export const FloatingBubble = ({
             className="text-[11px] font-black text-white leading-none"
             style={{ letterSpacing: '0.02em' }}
           >
-            {mode === 'pre-assigned' ? countdown : (duration ?? '—')}
+            {countdown}
           </span>
           {mode === 'pre-assigned' && seconds < 60 && (
-            <span className="text-[8px] text-red-300 font-bold uppercase">¡Urgente!</span>
+            <span className="text-[8px] text-red-300 font-bold uppercase mt-0.5">¡Urgente!</span>
           )}
         </motion.div>
 
         {/* Pulse ring cuando queda poco tiempo */}
-        {mode === 'pre-assigned' && seconds < 60 && (
+        {seconds < 60 && (
           <motion.div
-            className="absolute inset-0 rounded-full border-2 border-red-400"
+            className="absolute inset-0 rounded-full border-2 border-red-400 pointer-events-none"
             animate={{ scale: [1, 1.4, 1], opacity: [1, 0, 1] }}
             transition={{ repeat: Infinity, duration: 1.2 }}
           />
         )}
       </motion.div>
-    </>
+    </>,
+    document.body
   );
 };
 

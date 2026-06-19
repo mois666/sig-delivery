@@ -9,19 +9,34 @@ import { socket } from '@/lib/socket';
 import { useAuthStore } from '@/stores/authStore';
 import { useOrderStore } from '@/stores/orderStore';
 import { useSocketStore } from '@/stores/socketStore';
-import { IAddOrder } from '@/interfaces/orders-interface';
 
 // Componentes
 import ChallengeCard from '@/components/ChallengeCard';
 import LevelBadge from '@/components/LevelBadge';
 import { FloatingBubble } from '@/components/FloatingBubble';
 import { OrderDetailModal } from '@/components/modals/OrderDetailModal';
-import { PreAssignModal } from '@/components/modals/PreAssignModal';
 import { cn } from '@/lib/utils';
+
+// Helper to parse duration string (HH:MM:SS or e.g., "25 min") to seconds
+const parseDurationToSeconds = (durationStr: string | null | undefined): number => {
+  if (!durationStr) return 0;
+  const parts = durationStr.split(':');
+  if (parts.length === 3) {
+    const hh = parseInt(parts[0], 10) || 0;
+    const mm = parseInt(parts[1], 10) || 0;
+    const ss = parseInt(parts[2], 10) || 0;
+    return hh * 3600 + mm * 60 + ss;
+  }
+  const match = durationStr.match(/(\d+)/);
+  if (match) {
+    return parseInt(match[0], 10) * 60;
+  }
+  return 15 * 60;
+};
 
 const DriverHome = () => {
   const navigate = useNavigate();
-  const { user } = useAuthStore();
+  const { user, updateUser } = useAuthStore();
   const {
     availableOrders,
     activeOrder,
@@ -33,15 +48,16 @@ const DriverHome = () => {
     abortDelivery,
     addOrderLocally,
     removeOrderLocally,
-    setPreAssignedOrder,
     clearPreAssignment,
+    updateOrderStatus,
+    completeOrder,
   } = useOrderStore();
   const { isConnected, initConnectionListener } = useSocketStore();
 
   // ─── Estado local de modales ───────────────────────────────────────────────
-  const [detailOrder, setDetailOrder] = useState<IAddOrder | null>(null);
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [isViewingActiveOrPreassigned, setIsViewingActiveOrPreassigned] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
-  const [showPreAssignModal, setShowPreAssignModal] = useState(false);
   const [isAcceptLoading, setIsAcceptLoading] = useState(false);
   const [isStartLoading, setIsStartLoading] = useState(false);
   const [isAbortLoading, setIsAbortLoading] = useState(false);
@@ -52,10 +68,14 @@ const DriverHome = () => {
     fetchAvailableOrders();
   }, []);
 
-  // 2. Redirigir si hay una orden activa (assigned)
+  // 2. Auto-abrir modal si ya hay un pedido activo o pre-asignado al cargar la página
   useEffect(() => {
-    if (activeOrder) navigate('/active-delivery');
-  }, [activeOrder, navigate]);
+    const state = useOrderStore.getState();
+    if (state.activeOrder || state.preAssignedOrder) {
+      setIsViewingActiveOrPreassigned(true);
+      setShowDetailModal(true);
+    }
+  }, []);
 
   // 3. Socket — Tiempo Real
   useEffect(() => {
@@ -73,7 +93,6 @@ const DriverHome = () => {
 
     // Alguien más tomó un pedido que estaba disponible
     socket.on('order_pre_assigned', (order: any) => {
-      // Si NO somos el driver reservador, sacarlo de nuestra lista
       if (order.reserved_driver_id !== user?.id) {
         removeOrderLocally(String(order.id));
       }
@@ -81,7 +100,6 @@ const DriverHome = () => {
 
     // Un pedido volvió a estar disponible (reserva expiró o fue abortada por otro)
     socket.on('order_activated', (order: any) => {
-      // Verificar que no lo tenemos ya
       const state = useOrderStore.getState();
       const exists = state.availableOrders.some((o) => o.id === String(order.id));
       if (!exists) addOrderLocally(order);
@@ -90,9 +108,9 @@ const DriverHome = () => {
     // La reserva propia expiró (back la mandó a active)
     socket.on('order_reservation_expired', (payload: { order_id: number }) => {
       const state = useOrderStore.getState();
-      if (state.preAssignedOrder && state.preAssignedOrder.id === String(payload.order_id)) {
+      if (state.preAssignedOrder && String(state.preAssignedOrder.id) === String(payload.order_id)) {
         clearPreAssignment();
-        setShowPreAssignModal(false);
+        setShowDetailModal(false);
         toast.warning('La reserva expiró. El pedido volvió a estar disponible.');
       }
     });
@@ -113,46 +131,85 @@ const DriverHome = () => {
 
   // ─── Handlers ─────────────────────────────────────────────────────────────
   const handleCardAccept = (orderId: string) => {
-    const order = availableOrders.find((o) => o.id === orderId);
-    if (!order) return;
-    setDetailOrder(order);
+    setSelectedOrderId(orderId);
+    setIsViewingActiveOrPreassigned(false);
     setShowDetailModal(true);
   };
 
-  const handleDetailAccept = async (order: IAddOrder) => {
+  const handleDetailAccept = async (order: any) => {
     if (!user) return;
     setIsAcceptLoading(true);
     try {
       await preAssignOrder(order.id, user.id);
-      setShowDetailModal(false);
-      setShowPreAssignModal(true);
+      setIsViewingActiveOrPreassigned(true);
+      setSelectedOrderId(null);
     } finally {
       setIsAcceptLoading(false);
     }
   };
 
-  const handleStartDelivery = async (order: IAddOrder) => {
+  const handleStartDelivery = async (order: any) => {
     if (!user) return;
     setIsStartLoading(true);
     try {
       await startDelivery(order.id, user.id);
-      setShowPreAssignModal(false);
-      // Redirige automáticamente por el useEffect de activeOrder
+      setIsViewingActiveOrPreassigned(true);
+      setSelectedOrderId(null);
     } finally {
       setIsStartLoading(false);
     }
   };
 
-  const handleAbortDelivery = async (order: IAddOrder) => {
+  const handleAbortDelivery = async (order: any) => {
     if (!user) return;
     setIsAbortLoading(true);
     try {
       await abortDelivery(order.id, user.id);
-      setShowPreAssignModal(false);
+      setShowDetailModal(false);
+      setIsViewingActiveOrPreassigned(false);
+      setSelectedOrderId(null);
     } finally {
       setIsAbortLoading(false);
     }
   };
+
+  const handleCompleteOrder = async (orderId: string) => {
+    try {
+      const currentOrder = activeOrder || preAssignedOrder;
+      const points = currentOrder?.reward_points ?? currentOrder?.points ?? 0;
+      await completeOrder(orderId);
+      if (user) {
+        updateUser({ totalPoints: (user.totalPoints ?? 0) + points });
+      }
+    } catch (error) {
+      console.error('Error completing order:', error);
+    }
+  };
+
+  const handleBubbleClick = () => {
+    setIsViewingActiveOrPreassigned(true);
+    setSelectedOrderId(null);
+    setShowDetailModal(true);
+  };
+
+  // Determinar qué orden pasar al modal
+  let modalOrder = null;
+  if (isViewingActiveOrPreassigned) {
+    modalOrder = activeOrder || preAssignedOrder;
+  } else if (selectedOrderId) {
+    modalOrder = availableOrders.find((o) => o.id === selectedOrderId) || null;
+  }
+
+  // Calcular expiresAt para la bolita si está en carrera asignada
+  let bubbleExpiresAt = reservationExpiresAt;
+  if (activeOrder) {
+    const collectedAt = activeOrder.assignments?.[0]?.status_metadata?.collected_at;
+    if (collectedAt) {
+      const durationSec = parseDurationToSeconds(activeOrder.duration);
+      const expiresAtMs = new Date(collectedAt).getTime() + durationSec * 1000;
+      bubbleExpiresAt = new Date(expiresAtMs).toISOString();
+    }
+  }
 
   return (
     <div className="min-h-screen bg-background pb-24 safe-top">
@@ -224,31 +281,31 @@ const DriverHome = () => {
       </div>
 
       {/* ─── Bolita flotante ─────────────────────────────────────────────────── */}
-      {preAssignedOrder && !activeOrder && (
+      {(preAssignedOrder || activeOrder) && (
         <FloatingBubble
-          mode="pre-assigned"
-          expiresAt={reservationExpiresAt}
-          duration={preAssignedOrder.duration}
-          onClick={() => setShowPreAssignModal(true)}
+          mode={activeOrder ? 'assigned' : 'pre-assigned'}
+          expiresAt={activeOrder ? bubbleExpiresAt : reservationExpiresAt}
+          duration={activeOrder ? activeOrder.duration : preAssignedOrder?.duration}
+          onClick={handleBubbleClick}
+          visible={!showDetailModal}
         />
       )}
 
       {/* ─── Modal de detalle del pedido ─────────────────────────────────────── */}
       <OrderDetailModal
-        order={detailOrder}
+        order={modalOrder}
         isOpen={showDetailModal}
-        onClose={() => setShowDetailModal(false)}
+        onClose={() => {
+          setShowDetailModal(false);
+          setSelectedOrderId(null);
+          setIsViewingActiveOrPreassigned(false);
+        }}
         onAccept={handleDetailAccept}
-        isLoading={isAcceptLoading}
-      />
-
-      {/* ─── Modal de pre-asignación ──────────────────────────────────────────── */}
-      <PreAssignModal
-        order={preAssignedOrder}
-        isOpen={showPreAssignModal}
-        onClose={() => setShowPreAssignModal(false)}
         onStart={handleStartDelivery}
         onAbort={handleAbortDelivery}
+        onUpdateStatus={updateOrderStatus}
+        onComplete={handleCompleteOrder}
+        isLoading={isAcceptLoading}
         isStartLoading={isStartLoading}
         isAbortLoading={isAbortLoading}
       />

@@ -5,7 +5,6 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 import { MainLayout } from "@/layouts/MainLayout";
 import Login from "./pages/Login";
 import DriverHome from "./pages/DriverHome";
-import ActiveDelivery from "./pages/ActiveDelivery";
 import Ranking from "./pages/Ranking";
 import Wallet from "./pages/Wallet";
 import Profile from "./pages/Profile";
@@ -50,11 +49,7 @@ const AppRoutes = () => (
           <DriverHome />
         </ProtectedRoute>
       } />
-      <Route path="/active-delivery" element={
-        <ProtectedRoute allowedRoles={['driver']}>
-          <ActiveDelivery />
-        </ProtectedRoute>
-      } />
+      <Route path="/active-delivery" element={<Navigate to="/home" replace />} />
       <Route path="/wallet" element={
         <ProtectedRoute allowedRoles={['driver']}>
           <Wallet />

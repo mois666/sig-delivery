@@ -4,11 +4,16 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { MapContainer, TileLayer, Marker, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import {
-  X, MapPin, Clock, Star, Package, Navigation, ExternalLink,
-  DollarSign, CheckCircle, XCircle, AlertTriangle
-} from 'lucide-react';
-import { Button, Chip, Modal } from '@heroui/react';
+
+// ─── React Icons ─────────────────────────────────────────────────────────────
+import { 
+  FaBox, FaDollarSign, FaStar, FaExternalLinkAlt, FaLocationArrow
+} from 'react-icons/fa';
+import { 
+  IoClose, IoTimeOutline, IoWarning, IoOpenOutline, IoNavigation
+} from 'react-icons/io5';
+
+import { Button, Chip, Modal, Surface } from '@heroui/react';
 import { useOrderStore } from '@/stores/orderStore';
 import { cn } from '@/lib/utils';
 
@@ -152,7 +157,7 @@ export const OrderDetailModal = ({
     }
   }, [isOpen]);
 
-  // Calculate remaining time target for the countdown (must be before conditional return for Hook stability)
+  // Calculate remaining time target for the countdown
   let expiresAt: string | null = null;
   const currentStatus = order?.status;
   if (order) {
@@ -191,6 +196,17 @@ export const OrderDetailModal = ({
     : '#';
 
   const rewardPts = order.reward_points ?? order.points ?? 0;
+
+  // Calculate countdown circle progress
+  const totalSecs = currentStatus === 'pre-assigned'
+    ? 5 * 60
+    : parseDurationToSeconds(order.duration);
+
+  const progress = totalSecs > 0
+    ? Math.max(0, Math.min(100, (remainingSeconds / totalSecs) * 100))
+    : 100;
+
+  const isExhausted = remainingSeconds <= 0;
 
   // Status transitions handlers
   const handleAcceptClick = () => {
@@ -244,89 +260,179 @@ export const OrderDetailModal = ({
   return (
     <>
       <Modal isOpen={isOpen}>
-        <Modal.Backdrop className="bg-black/60 backdrop-blur-[3px] z-[99999] flex items-end sm:items-center justify-center">
-          <Modal.Container className="z-[99999] w-full flex items-end sm:items-center justify-center">
-            <Modal.Dialog className="w-full sm:max-w-lg bg-background rounded-t-3xl sm:rounded-3xl overflow-hidden max-h-[96dvh] flex flex-col border border-divider outline-none">
-              {/* Scrollable content containing all 9 rows */}
-              <div className="overflow-y-auto flex-1 p-5 space-y-4">
+        <Modal.Backdrop className="bg-black/80 backdrop-blur-md z-[99999] flex items-end sm:items-center justify-center">
+          <Modal.Container className="z-[99999] w-full flex items-end sm:items-center justify-center p-0 sm:p-4">
+            <Modal.Dialog className="w-full sm:max-w-lg bg-background rounded-t-[28px] sm:rounded-[28px] overflow-hidden max-h-[96dvh] flex flex-col border border-divider outline-none shadow-2xl">
+              
+              {/* Header con CloseTrigger */}
+              <Modal.Header className="border-b border-divider flex flex-col p-5 gap-3 items-center relative shrink-0">
+                <Modal.CloseTrigger onPress={onClose} className="absolute top-4 right-4 text-muted-foreground hover:text-foreground z-50 p-1.5 hover:bg-default-100 rounded-full transition-colors" />
+                
+                {['pre-assigned', 'collected', 'running', 'arrived'].includes(currentStatus) && expiresAt ? (
+                  <div className="flex flex-col gap-3 w-full mt-2">
+                    <div className="flex items-center justify-between p-3.5 bg-default-50 border border-divider rounded-2xl shadow-sm w-full">
+                      <div className="flex items-center gap-3">
+                        <div className={cn(
+                          "p-2.5 rounded-xl text-white shrink-0 shadow-sm transition-all duration-300",
+                          isExhausted 
+                            ? "bg-danger shadow-danger/25" 
+                            : "bg-success shadow-success/20"
+                        )}>
+                          <IoTimeOutline className="w-5 h-5" />
+                        </div>
+                        <div className="text-left">
+                          <p className="text-[10px] uppercase font-extrabold tracking-wider text-muted-foreground leading-none mb-1 font-display font-black">
+                            {currentStatus === 'pre-assigned' ? 'Tiempo para aceptar' : 'Tiempo límite de entrega'}
+                          </p>
+                          <h2 className="text-sm font-bold text-foreground leading-none font-display">
+                            Pedido #{String(order.id).slice(-6).toUpperCase()}
+                          </h2>
+                        </div>
+                      </div>
+                      
+                      <div className="text-right">
+                        <span className={cn(
+                          "font-mono text-2xl font-black tracking-tight",
+                          isExhausted 
+                            ? "text-danger" 
+                            : "text-success"
+                        )}>
+                          {countdown}
+                        </span>
+                      </div>
+                    </div>
 
-                {/* FILA 0: Header (Standard title or large countdown for pre-assigned/assigned) */}
-                <div className="flex items-center justify-between">
-                  {['pre-assigned', 'collected', 'running', 'arrived'].includes(currentStatus) && expiresAt ? (
-                    <div className="flex-1 text-center py-2 bg-muted/30 rounded-2xl border border-border/50">
-                      <p className="text-[10px] uppercase font-black tracking-wider text-muted-foreground mb-0.5">
-                        {currentStatus === 'pre-assigned' ? 'Tiempo restante para aceptar carrera' : 'Tiempo límite de entrega'}
-                      </p>
-                      <p className={cn(
-                        "font-mono text-3xl font-black tracking-tight",
-                        currentStatus === 'pre-assigned'
-                          ? (remainingSeconds < 60 ? 'text-destructive animate-pulse' : 'text-primary')
-                          : 'text-destructive'
-                      )}>
-                        {countdown}
-                      </p>
+                    {/* Progress Bar (Lineal) */}
+                    <div className="w-full h-2 bg-default-100 rounded-full overflow-hidden border border-divider">
+                      <motion.div 
+                        className={cn(
+                          "h-full rounded-full",
+                          isExhausted ? "bg-danger" : "bg-success"
+                        )}
+                        initial={{ width: '100%' }}
+                        animate={{ width: `${progress}%` }}
+                        style={{
+                          boxShadow: isExhausted 
+                            ? "0 0 8px rgba(239, 68, 68, 0.4)" 
+                            : "0 0 6px rgba(16, 185, 129, 0.3)"
+                        }}
+                        transition={{ duration: 0.5, ease: 'easeOut' }}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-row items-center gap-3.5 w-full mt-2 text-left">
+                    <Modal.Icon className="rounded-2xl p-3 bg-primary/10 text-primary border border-primary/20 shrink-0">
+                      <FaBox className="w-5 h-5" />
+                    </Modal.Icon>
+                    <div>
+                      <Modal.Heading className="text-lg font-black uppercase tracking-tight font-display">Detalle del Pedido</Modal.Heading>
+                      <p className="text-xs text-muted-foreground font-mono">#{String(order.id).slice(-6).toUpperCase()}</p>
+                    </div>
+                  </div>
+                )}
+              </Modal.Header>
+
+              {/* Body del Modal */}
+              <Modal.Body className="overflow-y-auto flex-1 p-5 space-y-5 custom-scrollbar">
+                
+                {/* 1. Earnings & Reward Card */}
+                <div className="grid grid-cols-2 gap-3.5">
+                  <div className="flex items-center gap-3 p-3.5 bg-success/10 rounded-2xl border border-success/20 shadow-sm">
+                    <div className="p-2 bg-success/20 rounded-xl text-success shadow-inner shrink-0">
+                      <FaDollarSign className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-success/70 font-black uppercase tracking-wider block font-display">Ganancia</span>
+                      <span className="text-base font-black text-success leading-tight font-display">
+                        Bs {Number(order.delivery_fee).toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  {rewardPts > 0 ? (
+                    <div className="flex items-center gap-3 p-3.5 bg-primary/10 rounded-2xl border border-primary/20 shadow-sm">
+                      <div className="p-2 bg-primary/20 rounded-xl text-primary shadow-inner shrink-0">
+                        <FaStar className="w-5 h-5 text-warning" />
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-primary/70 font-black uppercase tracking-wider block font-display">Recompensa</span>
+                        <span className="text-base font-black text-primary leading-tight font-display">
+                          +{rewardPts} pts
+                        </span>
+                      </div>
                     </div>
                   ) : (
-                    <div>
-                      <p className="text-xs text-muted-foreground uppercase tracking-wide font-bold">Detalle del Pedido</p>
-                      <h2 className="text-xl font-display font-bold text-foreground">#{String(order.id).slice(-6).toUpperCase()}</h2>
+                    <div className="flex items-center gap-3 p-3.5 bg-default-100 rounded-2xl border border-divider">
+                      <div className="p-2 bg-default-200 rounded-xl text-muted-foreground shrink-0">
+                        <FaStar className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-muted-foreground font-black uppercase tracking-wider block font-display">Recompensa</span>
+                        <span className="text-sm font-bold text-muted-foreground leading-tight">
+                          Sin puntos
+                        </span>
+                      </div>
                     </div>
                   )}
-                  <button
-                    onClick={onClose}
-                    className="w-9 h-9 rounded-full bg-muted flex items-center justify-center text-muted-foreground hover:bg-muted/80 transition-colors ml-4"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
                 </div>
 
-                {/* FILA 1: Chips (Delivery fee in Green and Points in Blue with Star) */}
-                <div className="flex gap-2.5">
-                  <Chip
-                    startContent={<DollarSign className="w-4 h-4 text-success-600" />}
-                    color="success"
-                    variant="flat"
-                    size="lg"
-                    className="font-bold text-base px-3 bg-success/15 text-success"
-                  >
-                    Bs {Number(order.delivery_fee).toFixed(2)}
-                  </Chip>
-                  {rewardPts > 0 && (
-                    <Chip
-                      startContent={<Star className="w-4 h-4 text-primary-600" />}
-                      color="primary"
-                      variant="flat"
-                      size="lg"
-                      className="font-bold text-base px-3 bg-primary/15 text-primary"
-                    >
-                      +{rewardPts} pts
-                    </Chip>
-                  )}
+                {/* 2. Timeline de Ruta (Recojo A -> Entrega B) */}
+                <div className="p-4 bg-default-50 border border-divider rounded-2xl relative shadow-inner">
+                  <div className="absolute left-[30px] top-[40px] bottom-[40px] w-0.5 border-l-2 border-dashed border-default-300 z-0" />
+                  
+                  <div className="relative z-10 flex flex-col gap-5">
+                    {/* Recojo */}
+                    <div className="flex gap-4 items-start">
+                      <div className="w-8 h-8 rounded-full bg-danger/10 text-danger border border-danger/25 flex items-center justify-center font-black text-xs shrink-0 shadow-sm">
+                        A
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-[9px] text-danger/80 font-black uppercase tracking-widest block mb-0.5 font-display">Punto de Recojo</span>
+                        <p className="text-sm font-semibold text-foreground leading-snug break-words">
+                          {order.address_a || order.pickup}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    {/* Entrega */}
+                    <div className="flex gap-4 items-start">
+                      <div className="w-8 h-8 rounded-full bg-primary/10 text-primary border border-primary/25 flex items-center justify-center font-black text-xs shrink-0 shadow-sm">
+                        B
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-[9px] text-primary/80 font-black uppercase tracking-widest block mb-0.5 font-display">Punto de Entrega</span>
+                        <p className="text-sm font-semibold text-foreground leading-snug break-words">
+                          {order.address_b || order.delivery}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
-                {/* FILA 2: Acciones GPS (Activar GPS / Abrir Google Maps) */}
-                <div className="flex gap-2.5">
+                {/* 3. Acciones de GPS */}
+                <div className="flex gap-3">
                   <a
                     href={`geo:${pickupCoords?.[0]},${pickupCoords?.[1]}`}
-                    className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl border border-border/50 bg-background/50 hover:bg-muted/40 transition-colors text-xs font-bold text-muted-foreground"
+                    className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl border border-divider bg-background hover:bg-default-100 transition-all text-xs font-bold text-foreground btn-premium shadow-sm"
                   >
-                    <Navigation className="w-4 h-4" />
+                    <FaLocationArrow className="w-3.5 h-3.5 text-primary" />
                     Activar GPS
                   </a>
                   <a
                     href={mapsUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl border border-border/50 bg-background/50 hover:bg-muted/40 transition-colors text-xs font-bold text-muted-foreground"
+                    className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl border border-divider bg-background hover:bg-default-100 transition-all text-xs font-bold text-foreground btn-premium shadow-sm"
                   >
-                    <ExternalLink className="w-4 h-4" />
+                    <FaExternalLinkAlt className="w-3.5 h-3.5 text-primary" />
                     Abrir Google Map
                   </a>
                 </div>
 
-                {/* FILA 3: Leaflet Map (Red=Pickup, Blue=Delivery, YO=Current location) */}
+                {/* 4. Leaflet Map */}
                 {hasMap && mapReady && (
-                  <div className="rounded-2xl overflow-hidden border border-border/30" style={{ height: 210 }}>
+                  <div className="rounded-[20px] overflow-hidden border border-divider shadow-md relative" style={{ height: 200 }}>
                     <MapContainer center={mapCenter} zoom={14} style={{ height: '100%', width: '100%' }} zoomControl={false} attributionControl={false}>
                       <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                       <FitBounds positions={positions} />
@@ -334,126 +440,121 @@ export const OrderDetailModal = ({
                       {deliveryCoords && <Marker position={deliveryCoords} icon={deliveryIcon} />}
                       {userLocation && <Marker position={userLocation} icon={userIcon} />}
                       {positions.length >= 2 && pickupCoords && deliveryCoords && (
-                        <Polyline positions={[pickupCoords, deliveryCoords]} pathOptions={{ color: '#3b82f6', weight: 3, dashArray: '6 4' }} />
+                        <Polyline positions={[pickupCoords, deliveryCoords]} pathOptions={{ color: '#3b82f6', weight: 4, dashArray: '6 4' }} />
                       )}
                     </MapContainer>
                   </div>
                 )}
 
-                {/* FILA 4: Recojo */}
-                <div className="glass-card p-3 rounded-xl">
-                  <p className="text-sm text-foreground leading-snug">
-                    <strong className="text-muted-foreground uppercase text-[10px] block font-bold mb-0.5">Recojo:</strong>
-                    {order.address_a || order.pickup}
-                  </p>
-                </div>
-
-                {/* FILA 5: Entrega */}
-                <div className="glass-card p-3 rounded-xl">
-                  <p className="text-sm text-foreground leading-snug">
-                    <strong className="text-muted-foreground uppercase text-[10px] block font-bold mb-0.5">Entrega:</strong>
-                    {order.address_b || order.delivery}
-                  </p>
-                </div>
-
-                {/* FILA 6: Tiempo Aprox. Entrega */}
-                <div className="glass-card p-3 rounded-xl">
-                  <p className="text-sm text-foreground">
-                    <strong className="text-muted-foreground uppercase text-[10px] block font-bold mb-0.5">Tiempo Aprox. Entrega:</strong>
-                    {order.address_metadata?.duration || order.duration || '—'}
-                  </p>
-                </div>
-
-                {/* FILA 7: Detalle */}
-                <div className="glass-card p-3 rounded-xl">
-                  <p className="text-sm text-foreground leading-relaxed">
-                    <strong className="text-muted-foreground uppercase text-[10px] block font-bold mb-0.5">Detalle:</strong>
-                    {order.description || 'Sin descripción disponible.'}
-                  </p>
-                </div>
-
-                {/* FILA 8: Botones dinámicos basados en status */}
-                <div className="pt-2">
-                  {currentStatus === 'active' && (
-                    <div className="flex gap-3">
-                      <Button
-                        variant="flat"
-                        color="default"
-                        className="flex-1 h-13 font-bold text-destructive hover:bg-destructive/10"
-                        onClick={onClose}
-                        disabled={isLoading}
-                      >
-                        Cancelar
-                      </Button>
-                      <Button
-                        color="primary"
-                        className="flex-[2] h-13 font-bold shadow-lg shadow-primary/20"
-                        onClick={handleAcceptClick}
-                        isLoading={isLoading}
-                      >
-                        Aceptar
-                      </Button>
+                {/* 5. Detalles adicionales */}
+                <div className="grid grid-cols-1 gap-3.5">
+                  <Surface className="p-4 border border-divider rounded-2xl bg-default-50/50 flex gap-3.5 items-start shadow-sm">
+                    <div className="p-2.5 bg-default-200/50 rounded-xl text-muted-foreground shrink-0 shadow-inner">
+                      <IoTimeOutline className="w-4 h-4" />
                     </div>
-                  )}
-
-                  {currentStatus === 'pre-assigned' && (
-                    <div className="flex gap-3">
-                      <Button
-                        variant="flat"
-                        color="danger"
-                        className="flex-1 h-13 font-bold"
-                        onClick={handleAbortClick}
-                        isLoading={isAbortLoading}
-                        disabled={isStartLoading}
-                      >
-                        Abortar Carrera
-                      </Button>
-                      <Button
-                        color="primary"
-                        className="flex-[2] h-13 font-bold shadow-lg shadow-primary/20"
-                        onClick={handleStartClick}
-                        isLoading={isStartLoading}
-                        disabled={isAbortLoading}
-                      >
-                        Iniciar Carrera
-                      </Button>
+                    <div>
+                      <span className="text-[10px] text-muted-foreground font-black uppercase tracking-wider block mb-0.5 font-display">Tiempo Aprox. Entrega</span>
+                      <p className="text-sm font-bold text-foreground font-display">
+                        {order.address_metadata?.duration || order.duration || '—'}
+                      </p>
                     </div>
-                  )}
+                  </Surface>
+                  
+                  <Surface className="p-4 border border-divider rounded-2xl bg-default-50/50 flex gap-3.5 items-start shadow-sm">
+                    <div className="p-2.5 bg-default-200/50 rounded-xl text-muted-foreground shrink-0 shadow-inner">
+                      <FaBox className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-muted-foreground font-black uppercase tracking-wider block mb-0.5 font-display">Descripción del Pedido</span>
+                      <p className="text-sm text-foreground/95 leading-relaxed font-sans font-medium">
+                        {order.description || 'Sin descripción disponible.'}
+                      </p>
+                    </div>
+                  </Surface>
+                </div>
+              </Modal.Body>
 
-                  {['collected', 'running'].includes(currentStatus) && (
+              {/* Footer con Botones dinámicos */}
+              <Modal.Footer className="p-5 border-t border-divider bg-default-50/70 flex flex-col gap-3 shrink-0">
+                {currentStatus === 'active' && (
+                  <div className="flex gap-3 w-full">
+                    <Button
+                      variant="flat"
+                      className="flex-1 h-12 font-bold text-danger hover:bg-danger/10 rounded-xl text-sm"
+                      onClick={onClose}
+                      disabled={isLoading}
+                    >
+                      Cancelar
+                    </Button>
                     <Button
                       color="primary"
-                      className="w-full h-13 font-bold text-base shadow-lg shadow-primary/20"
-                      onClick={handleArrivedClick}
+                      className="flex-[2] h-12 font-black text-white bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl shadow-md shadow-blue-500/20 btn-premium hover:from-blue-700 hover:to-indigo-700 text-sm"
+                      onClick={handleAcceptClick}
+                      isLoading={isLoading}
+                    >
+                      ACEPTAR CARRERA
+                    </Button>
+                  </div>
+                )}
+
+                {currentStatus === 'pre-assigned' && (
+                  <div className="flex gap-3 w-full">
+                    <Button
+                      variant="flat"
+                      color="danger"
+                      className="flex-1 h-12 font-bold rounded-xl text-sm"
+                      onClick={handleAbortClick}
+                      isLoading={isAbortLoading}
+                      disabled={isStartLoading}
+                    >
+                      Abortar Carrera
+                    </Button>
+                    <Button
+                      color="primary"
+                      className="flex-[2] h-12 font-black text-white bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl shadow-md shadow-blue-500/20 btn-premium hover:from-blue-700 hover:to-indigo-700 text-sm"
+                      onClick={handleStartClick}
+                      isLoading={isStartLoading}
+                      disabled={isAbortLoading}
+                    >
+                      INICIAR ENTREGA
+                    </Button>
+                  </div>
+                )}
+
+                {['collected', 'running'].includes(currentStatus) && (
+                  <Button
+                    color="primary"
+                    className="w-full h-12 font-black text-sm text-white bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl shadow-md shadow-blue-500/20 btn-premium hover:from-blue-700 hover:to-indigo-700"
+                    onClick={handleArrivedClick}
+                    isLoading={localActionLoading}
+                  >
+                    LLEGUÉ AL LUGAR DE ENTREGA
+                  </Button>
+                )}
+
+                {currentStatus === 'arrived' && (
+                  <div className="flex gap-3 w-full">
+                    <Button
+                      variant="flat"
+                      color="danger"
+                      className="flex-1 h-12 font-bold rounded-xl text-sm"
+                      onClick={() => setShowNotDeliveredConfirm(true)}
+                      disabled={localActionLoading}
+                    >
+                      No se pudo entregar
+                    </Button>
+                    <Button
+                      color="success"
+                      className="flex-[2] h-12 font-black text-white bg-gradient-to-r from-emerald-600 to-teal-600 rounded-xl shadow-md shadow-emerald-500/20 btn-premium hover:from-emerald-700 hover:to-teal-700 text-sm"
+                      onClick={handleCompleteClick}
                       isLoading={localActionLoading}
                     >
-                      Llegué al lugar
+                      ENTREGAR PEDIDO
                     </Button>
-                  )}
+                  </div>
+                )}
+              </Modal.Footer>
 
-                  {currentStatus === 'arrived' && (
-                    <div className="flex gap-3">
-                      <Button
-                        variant="flat"
-                        color="danger"
-                        className="flex-1 h-13 font-bold"
-                        onClick={() => setShowNotDeliveredConfirm(true)}
-                        disabled={localActionLoading}
-                      >
-                        No se pudo entregar
-                      </Button>
-                      <Button
-                        color="success"
-                        className="flex-[2] h-13 font-bold text-white shadow-lg shadow-success/20"
-                        onClick={handleCompleteClick}
-                        isLoading={localActionLoading}
-                      >
-                        Entregar
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              </div>
             </Modal.Dialog>
           </Modal.Container>
         </Modal.Backdrop>
@@ -473,28 +574,28 @@ export const OrderDetailModal = ({
               animate={{ y: 0 }}
               exit={{ y: '100%' }}
               transition={{ type: 'spring', damping: 28 }}
-              className="w-full max-w-md bg-background rounded-t-3xl p-6 pb-10"
+              className="w-full max-w-md bg-background rounded-t-3xl p-6 pb-10 border-t border-divider"
             >
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-11 h-11 rounded-full bg-danger/15 flex items-center justify-center">
-                  <AlertTriangle className="w-5 h-5 text-danger" />
+                <div className="w-11 h-11 rounded-full bg-danger/15 flex items-center justify-center shrink-0">
+                  <IoWarning className="w-5 h-5 text-danger" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-foreground">¿No pudiste entregar?</h3>
-                  <p className="text-sm text-muted-foreground">El pedido quedará registrado como no entregado.</p>
+                  <h3 className="font-bold text-foreground font-display">¿No pudiste entregar el pedido?</h3>
+                  <p className="text-sm text-muted-foreground">El pedido quedará registrado permanentemente como no entregado.</p>
                 </div>
               </div>
               <div className="flex gap-3 mt-6">
                 <Button
                   variant="flat"
-                  className="flex-1 font-bold"
+                  className="flex-1 font-bold rounded-xl text-sm"
                   onClick={() => setShowNotDeliveredConfirm(false)}
                 >
                   Cancelar
                 </Button>
                 <Button
                   color="danger"
-                  className="flex-1 font-bold"
+                  className="flex-1 font-bold rounded-xl text-sm btn-premium"
                   onClick={handleNotDeliveredClick}
                   isLoading={localActionLoading}
                 >

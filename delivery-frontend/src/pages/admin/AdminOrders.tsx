@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Package, MapPin, Star, Trash2, Clock, Info, ChevronDown, Navigation, Gauge, Edit, Play } from 'lucide-react';
+import { Plus, Package, MapPin, Star, Trash2, Clock, Info, ChevronDown, Navigation, Gauge, Edit, Play, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@heroui/react';
 import { useOrderStore } from '@/stores/orderStore';
 import { ChallengeModal } from '@/components/modals/ChallengeModal';
@@ -98,10 +98,37 @@ export const AdminOrders = () => {
     const [editModalOpen, setEditModalOpen] = useState(false);
     const [editingOrder, setEditingOrder] = useState<any>(null);
     const [expandedId, setExpandedId] = useState<number | null>(null);
+    const [search, setSearch] = useState('');
+    const [page, setPage] = useState(1);
+    const PAGE_SIZE = 12;
 
     useEffect(() => {
         fetchOrders();
     }, []);
+
+    // Reset page when search changes
+    useEffect(() => { setPage(1); }, [search]);
+
+    const filteredOrders = useMemo(() => {
+        if (!search.trim()) return orders;
+        const q = search.toLowerCase();
+        return orders.filter((o: any) =>
+            o.client_name?.toLowerCase().includes(q) ||
+            o.address_a?.toLowerCase().includes(q) ||
+            o.address_b?.toLowerCase().includes(q) ||
+            o.address_metadata?.address_a?.toLowerCase().includes(q) ||
+            o.address_metadata?.address_b?.toLowerCase().includes(q)
+        );
+    }, [orders, search]);
+
+    const totalPages = Math.max(1, Math.ceil(filteredOrders.length / PAGE_SIZE));
+    const paginatedOrders = filteredOrders.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+    const statusCounts = useMemo(() => ({
+        pending: orders.filter((o: any) => o.status === 'pending').length,
+        active: orders.filter((o: any) => o.status === 'active').length,
+        assigned: orders.filter((o: any) => o.status === 'assigned').length,
+    }), [orders]);
 
     const handleDelete = async (id: string) => {
         if (window.confirm('¿Deseas cancelar esta orden permanentemente?')) {
@@ -124,15 +151,23 @@ export const AdminOrders = () => {
         setExpandedId(prev => (prev === id ? null : id));
 
     return (
-        <div className="min-h-screen bg-background pb-24 safe-top">
+        <div className="min-h-screen bg-background pb-24">
             {/* Header */}
-            <div className="glass-card border-b border-border/50 px-4 py-6 mb-6">
-                <div className="flex items-center justify-between">
+            <div className="mb-6">
+                <div className="flex items-center justify-between mb-4">
                     <div>
-                        <h1 className="text-xl font-display font-bold tracking-tight">Gestión de Órdenes</h1>
-                        <p className="text-[10px] uppercase font-bold text-primary/60 tracking-widest mt-1">
-                            {isLoading ? 'Sincronizando...' : `${orders.length} Pedidos en curso`}
-                        </p>
+                        <h1 className="text-2xl font-display font-black tracking-tight">Gestión de Órdenes</h1>
+                        <div className="flex items-center gap-2 mt-1">
+                            <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-black uppercase">
+                                {statusCounts.pending} pendientes
+                            </span>
+                            <span className="text-[10px] bg-success/10 text-success px-2 py-0.5 rounded-full font-black uppercase">
+                                {statusCounts.active} activos
+                            </span>
+                            <span className="text-[10px] bg-amber-500/10 text-amber-400 px-2 py-0.5 rounded-full font-black uppercase">
+                                {statusCounts.assigned} asignados
+                            </span>
+                        </div>
                     </div>
                     <Button
                         onClick={() => setShowModal(true)}
@@ -141,11 +176,37 @@ export const AdminOrders = () => {
                         <Plus className="w-4 h-4 mr-2" /> Nueva Carrera
                     </Button>
                 </div>
+
+                {/* Buscador */}
+                <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <input
+                        type="text"
+                        placeholder="Buscar por cliente, origen o destino..."
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        className="w-full h-11 pl-10 pr-4 bg-muted/40 border border-border/50 rounded-xl text-sm outline-none focus:border-primary/50 focus:bg-muted/60 transition-all placeholder:text-muted-foreground/60"
+                    />
+                    {search && (
+                        <button
+                            onClick={() => setSearch('')}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground text-xs font-bold"
+                        >
+                            ✕
+                        </button>
+                    )}
+                </div>
+
+                {search && (
+                    <p className="text-[11px] text-muted-foreground mt-1.5 px-1">
+                        {filteredOrders.length} resultado{filteredOrders.length !== 1 ? 's' : ''} para &quot;{search}&quot;
+                    </p>
+                )}
             </div>
 
             {/* Lista de Órdenes */}
-            <div className="px-4 space-y-4">
-                {orders.map((order: any, index: number) => {
+            <div className="space-y-4">
+                {paginatedOrders.map((order: any, index: number) => {
                     const config = orderTypeConfig[order.type] || orderTypeConfig.estandar;
                     const { icon: TypeIcon, label, color } = config;
                     const borderColor = order.type === 'programada' ? '#a855f7' : '#0070f0';
@@ -327,13 +388,49 @@ export const AdminOrders = () => {
                     );
                 })}
 
-                {orders.length === 0 && !isLoading && (
+                {paginatedOrders.length === 0 && !isLoading && (
                     <div className="text-center py-20">
                         <Package className="w-16 h-16 mx-auto mb-4 text-muted-foreground/20" />
-                        <p className="text-muted-foreground font-bold tracking-tight">Sin pedidos activos</p>
+                        <p className="text-muted-foreground font-bold tracking-tight">
+                            {search ? `Sin resultados para "${search}"` : 'Sin pedidos activos'}
+                        </p>
                     </div>
                 )}
             </div>
+
+            {/* Paginación */}
+            {totalPages > 1 && (
+                <div className="flex items-center justify-center gap-3 mt-8">
+                    <button
+                        onClick={() => setPage((p) => Math.max(1, p - 1))}
+                        disabled={page === 1}
+                        className="flex items-center gap-1 px-4 py-2 rounded-xl bg-muted/50 border border-border/50 text-sm font-bold disabled:opacity-40 hover:bg-muted transition-colors"
+                    >
+                        <ChevronLeft className="w-4 h-4" /> Anterior
+                    </button>
+                    <div className="flex items-center gap-1">
+                        {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+                            <button
+                                key={p}
+                                onClick={() => setPage(p)}
+                                className={cn(
+                                    'w-9 h-9 rounded-xl text-sm font-bold transition-all',
+                                    p === page ? 'bg-primary text-white shadow-md' : 'bg-muted/40 text-muted-foreground hover:bg-muted'
+                                )}
+                            >
+                                {p}
+                            </button>
+                        ))}
+                    </div>
+                    <button
+                        onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                        disabled={page === totalPages}
+                        className="flex items-center gap-1 px-4 py-2 rounded-xl bg-muted/50 border border-border/50 text-sm font-bold disabled:opacity-40 hover:bg-muted transition-colors"
+                    >
+                        Siguiente <ChevronRight className="w-4 h-4" />
+                    </button>
+                </div>
+            )}
 
             <AnimatePresence>
                 <ChallengeModal

@@ -6,6 +6,20 @@ const USER_INCLUDE = {
   wallet: true,
 } as const;
 
+/** Rango de fechas para filtro de ranking */
+const getPeriodRange = (period: string): { gte: Date; lte: Date } => {
+  const now = new Date();
+  const gte = new Date();
+  gte.setHours(0, 0, 0, 0);
+
+  if (period === 'week') {
+    gte.setDate(now.getDate() - 6);
+  } else if (period === 'month') {
+    gte.setDate(now.getDate() - 29);
+  }
+  return { gte, lte: now };
+};
+
 export class UserController {
   static async index(req: Request, res: Response) {
     try {
@@ -104,6 +118,93 @@ export class UserController {
       return res.json(activeDrivers);
     } catch (error) {
       return res.status(500).json({ message: 'Error al obtener repartidores activos' });
+    }
+  }
+
+  /** Top 10 repartidores por puntos, filtrado por período */
+  static async getDriversRanking(req: Request, res: Response) {
+    try {
+      const period = (req.query.period as string) || 'today';
+      const range = getPeriodRange(period);
+
+      // Obtener los drivers con mayor cantidad de puntos en el período
+      const drivers = await prisma.user.findMany({
+        where: { role: 'driver' },
+        include: {
+          wallet: true,
+          assignments: {
+            where: {
+              status: 'delivered',
+              created_at: range,
+            },
+          },
+        },
+        orderBy: { points: 'desc' },
+        take: 10,
+      });
+
+      const ranking = drivers.map((d, index) => ({
+        id: String(d.id),
+        name: d.name,
+        points: d.points,
+        deliveries: d.assignments.length,
+        level: 1,
+        rank: index + 1,
+        balance: d.wallet?.balance ?? 0,
+        trend: 'same' as const,
+      }));
+
+      return res.json(ranking);
+    } catch (error) {
+      console.error('getDriversRanking:', error);
+      return res.status(500).json({ message: 'Error al obtener ranking' });
+    }
+  }
+
+  /** Lista todos los conductores con su wallet y puntos */
+  static async getDriverWallets(req: Request, res: Response) {
+    try {
+      const drivers = await prisma.user.findMany({
+        where: { role: 'driver' },
+        include: { wallet: true },
+        orderBy: { points: 'desc' },
+      });
+
+      const result = drivers.map((d) => ({
+        id: d.id,
+        name: d.name,
+        phone: d.phone,
+        points: d.points,
+        level: 1,
+        status: d.status,
+        balance: d.wallet?.balance ?? 0,
+        wallet_id: d.wallet?.id ?? null,
+      }));
+
+      return res.json(result);
+    } catch (error) {
+      return res.status(500).json({ message: 'Error al obtener billeteras' });
+    }
+  }
+
+  /** Historial de transacciones de un conductor */
+  static async getDriverTransactions(req: Request, res: Response) {
+    const id = parseInt(req.params.id as string);
+    try {
+      const wallet = await prisma.wallet.findUnique({
+        where: { user_id: id },
+        include: {
+          transactions: {
+            orderBy: { created_at: 'desc' },
+            take: 50,
+          },
+        },
+      });
+
+      if (!wallet) return res.status(404).json({ message: 'Billetera no encontrada' });
+      return res.json({ wallet_id: wallet.id, balance: wallet.balance, transactions: wallet.transactions });
+    } catch (error) {
+      return res.status(500).json({ message: 'Error al obtener transacciones' });
     }
   }
 }

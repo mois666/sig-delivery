@@ -11,8 +11,11 @@ router.use(authMiddleware);
 router.get('/', authorizeRoles('admin', 'super_admin'), UserController.index);
 router.post('/', authorizeRoles('admin', 'super_admin'), validate(userStoreSchema), UserController.store);
 router.get('/drivers-active', UserController.getDriversActive);
+router.get('/ranking', authorizeRoles('admin', 'super_admin'), UserController.getDriversRanking);
+router.get('/wallets', authorizeRoles('admin', 'super_admin'), UserController.getDriverWallets);
 router.get('/:id', authorizeRoles('admin', 'super_admin'), UserController.show);
 router.put('/:id', authorizeRoles('admin', 'super_admin'), validate(userUpdateSchema), UserController.update);
 router.delete('/:id', authorizeRoles('admin', 'super_admin'), UserController.destroy);
+router.get('/:id/transactions', authorizeRoles('admin', 'super_admin'), UserController.getDriverTransactions);
 
 export default router;

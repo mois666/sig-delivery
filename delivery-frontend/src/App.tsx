@@ -18,6 +18,7 @@ import { useSocketStore } from "./stores/socketStore";
 import { useEffect } from "react";
 import AdminUsers from "./pages/admin/AdminUsers";
 import { AdminShowUser } from "./pages/admin/AdminShowUser";
+import AdminWallets from "./pages/admin/AdminWallets";
 import { Toaster } from "sonner";
 
 const queryClient = new QueryClient();
@@ -88,6 +89,12 @@ const AppRoutes = () => (
       <Route path="/orders" element={
         <ProtectedRoute allowedRoles={['admin', 'super_admin']}>
           <AdminOrders />
+        </ProtectedRoute>
+      } />
+
+      <Route path="/user-wallets" element={
+        <ProtectedRoute allowedRoles={['admin', 'super_admin']}>
+          <AdminWallets />
         </ProtectedRoute>
       } />
 

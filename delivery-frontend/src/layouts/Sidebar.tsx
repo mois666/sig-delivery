@@ -19,9 +19,8 @@ export const Sidebar = () => {
     { name: "Usuarios", path: "/users", icon: Users },
     { name: "Ciudades", path: "/cities", icon: Globe },
     { name: "Pedidos", path: "/orders", icon: ClipboardList },
-    { name: "Billetera", path: "/wallet", icon: Wallet },
+    { name: "Billetera", path: "/user-wallets", icon: Wallet },
     { name: "Ranking", path: "/ranking", icon: Trophy },
-
   ] : [
     { name: "Inicio", path: "/home", icon: Home },
     { name: "Entrega Activa", path: "/active-delivery", icon: Rocket },

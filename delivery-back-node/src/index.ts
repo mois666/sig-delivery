@@ -9,6 +9,9 @@ import routes from './routes';
 
 dotenv.config();
 
+// Configurar la zona horaria global de la aplicación
+process.env.TZ = process.env.APP_TIMEZONE || 'America/La_Paz';
+
 const app = express();
 const server = http.createServer(app);
 

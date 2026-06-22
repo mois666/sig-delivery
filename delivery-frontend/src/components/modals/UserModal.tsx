@@ -140,7 +140,7 @@ export const UserModal = ({ isOpen, onClose, onSubmit, user }: UserModalProps) =
     <Modal isOpen={isOpen}>
       <Modal.Backdrop className="bg-black/80 backdrop-blur-sm">
         <Modal.Container>
-          <Modal.Dialog className="w-full max-w-lg bg-background border border-divider rounded-[24px] overflow-hidden flex flex-col">
+          <Modal.Dialog className="w-full max-w-lg bg-background border border-divider rounded-[24px] overflow-hidden flex flex-col max-h-[90vh]">
             <Modal.CloseTrigger onPress={onClose} className="top-4 right-4 text-muted-foreground hover:text-foreground" />
 
             <Modal.Header className="border-b border-divider flex flex-row items-center gap-4">
@@ -152,8 +152,8 @@ export const UserModal = ({ isOpen, onClose, onSubmit, user }: UserModalProps) =
               </Modal.Heading>
             </Modal.Header>
 
-            <Form onSubmit={handleAction} className="w-full flex flex-col flex-1">
-              <Modal.Body className="p-6">
+            <Form onSubmit={handleAction} className="w-full flex flex-col flex-1 overflow-hidden">
+              <Modal.Body className="p-6 overflow-y-auto flex-1 custom-scrollbar">
                 <Fieldset className="w-full">
                   <Fieldset.Group>
                     {/* Nombre */}

@@ -69,6 +69,28 @@ const MapClickHandler = ({ onAdd }: { onAdd: (pt: [number, number]) => void }) =
     return null;
 };
 
+// ─── Helpers de accesibilidad ──────────────────────────────────────────────────
+
+const getCustomRateStyle = (rate: number) => {
+    const exact = EXTRA_RATE_OPTIONS.find(o => o.value === rate);
+    if (exact) return exact;
+
+    // Si no coincide exactamente, determinar colores basados en el valor:
+    // >= 0.8: Verde
+    // >= 0.6: Amarillo
+    // >= 0.4: Naranja
+    // < 0.4: Rojo
+    if (rate >= 0.8) {
+        return { color: '#84cc16', tw: 'text-lime-400', bg: 'bg-lime-500/10', border: 'border-lime-500/30' };
+    } else if (rate >= 0.6) {
+        return { color: '#eab308', tw: 'text-yellow-400', bg: 'bg-yellow-500/10', border: 'border-yellow-500/30' };
+    } else if (rate >= 0.4) {
+        return { color: '#f97316', tw: 'text-orange-400', bg: 'bg-orange-500/10', border: 'border-orange-500/30' };
+    } else {
+        return { color: '#ef4444', tw: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/30' };
+    }
+};
+
 // ─── Componente Principal ─────────────────────────────────────────────────────
 
 export const ZoneModal = ({ isOpen, onClose, onSubmit, initialData, cityCenter, city }: ZoneModalProps) => {
@@ -76,6 +98,7 @@ export const ZoneModal = ({ isOpen, onClose, onSubmit, initialData, cityCenter, 
 
     const [name, setName] = useState('');
     const [extraRate, setExtraRate] = useState<number>(1.0);
+    const [extraRateInput, setExtraRateInput] = useState<string>('1.00');
     const [color, setColor] = useState('#f97316');
     const [coords, setCoords] = useState<[number, number][]>([]);
     const [previewMode, setPreviewMode] = useState(false);
@@ -86,17 +109,35 @@ export const ZoneModal = ({ isOpen, onClose, onSubmit, initialData, cityCenter, 
         if (initialData) {
             setName(initialData.name ?? '');
             setExtraRate(initialData.extra_rate ?? 1.0);
+            setExtraRateInput((initialData.extra_rate ?? 1.0).toFixed(2));
             setColor(initialData.color ?? '#f97316');
             setCoords(coordsFromPolygon(initialData.polygon));
             setPreviewMode(false);
         } else {
             setName('');
             setExtraRate(1.0);
+            setExtraRateInput('1.00');
             setColor('#f97316');
             setCoords([]);
             setPreviewMode(false);
         }
     }, [isOpen, initialData]);
+
+    const handleExtraRateInputChange = (val: string) => {
+        if (val === '') {
+            setExtraRateInput('');
+            return;
+        }
+        // Expresión regular que permite números de 0.00 a 1.00 (máximo 2 decimales y hasta 1.00)
+        const regex = /^(0(\.\d{0,2})?|1(\.0{0,2})?)$/;
+        if (regex.test(val)) {
+            setExtraRateInput(val);
+            const parsed = parseFloat(val);
+            if (!isNaN(parsed) && parsed > 0) {
+                setExtraRate(parsed);
+            }
+        }
+    };
 
     const addPoint = useCallback((pt: [number, number]) => !previewMode && setCoords(p => [...p, pt]), [previewMode]);
     const undoPoint = () => setCoords(p => p.slice(0, -1));
@@ -104,16 +145,22 @@ export const ZoneModal = ({ isOpen, onClose, onSubmit, initialData, cityCenter, 
 
     const isReady = coords.length >= 3;
     const mapCenter = coords[0] ?? cityCenter ?? DEFAULT_CENTER;
-    const activeOpt = EXTRA_RATE_OPTIONS.find(o => o.value === extraRate) ?? EXTRA_RATE_OPTIONS[0];
+    const activeStyle = getCustomRateStyle(extraRate);
 
     const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         if (!isReady) return;
+
+        const parsedRate = parseFloat(extraRateInput);
+        if (isNaN(parsedRate) || parsedRate <= 0 || parsedRate > 1) {
+            return;
+        }
+
         const closed = [...coords.map(pt => [pt[1], pt[0]]), [coords[0][1], coords[0][0]]];
         onSubmit({
             ...(initialData ?? {}),
             name,
-            extra_rate: extraRate,
+            extra_rate: parsedRate,
             color,
             is_active: true,
             polygon: { type: 'Polygon', coordinates: [closed] },
@@ -301,7 +348,10 @@ export const ZoneModal = ({ isOpen, onClose, onSubmit, initialData, cityCenter, 
                                                     <motion.button
                                                         key={opt.value}
                                                         type="button"
-                                                        onClick={() => setExtraRate(opt.value)}
+                                                        onClick={() => {
+                                                            setExtraRate(opt.value);
+                                                            setExtraRateInput(opt.value.toFixed(2));
+                                                        }}
                                                         whileTap={{ scale: 0.95 }}
                                                         className={`relative flex items-center gap-2.5 px-3 py-2.5 rounded-xl border-2 transition-all duration-150 cursor-pointer text-left ${active ? `${opt.bg} ${opt.border}` : 'border-divider bg-default-50 hover:bg-default-100'
                                                             }`}
@@ -337,15 +387,43 @@ export const ZoneModal = ({ isOpen, onClose, onSubmit, initialData, cityCenter, 
                                             })}
                                         </div>
 
+                                        {/* Input editable de Factor */}
+                                        <div className="pt-2">
+                                            <TextField
+                                                isRequired
+                                                name="extraRateInput"
+                                                value={extraRateInput}
+                                                onChange={handleExtraRateInputChange}
+                                                validate={val => {
+                                                    if (!val) return 'El factor de accesibilidad es requerido';
+                                                    const parsed = parseFloat(val);
+                                                    if (isNaN(parsed) || parsed <= 0 || parsed > 1) {
+                                                        return 'Debe ser un número entre 0.01 y 1.00';
+                                                    }
+                                                    if (!/^(0(\.\d{1,2})?|1(\.0{1,2})?)$/.test(val)) {
+                                                        return 'Debe tener máximo 2 decimales (ej: 0.75)';
+                                                    }
+                                                    return null;
+                                                }}
+                                            >
+                                                <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wide">Valor del Factor de Accesibilidad (Editable)</Label>
+                                                <Input 
+                                                    placeholder="Ej: 0.75" 
+                                                    variant="flat" 
+                                                    className="mt-1"
+                                                />
+                                            </TextField>
+                                        </div>
+
                                         {/* Banner de impacto */}
                                         <motion.div
                                             layout
                                             key={extraRate}
                                             initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
-                                            className={`px-4 py-2.5 rounded-xl border text-[11px] font-bold flex items-center gap-2 ${activeOpt.bg} ${activeOpt.border}`}
+                                            className={`px-4 py-2.5 rounded-xl border text-[11px] font-bold flex items-center gap-2 ${activeStyle.bg} ${activeStyle.border}`}
                                         >
-                                            <Gauge className={`w-3.5 h-3.5 flex-shrink-0 ${activeOpt.tw}`} />
-                                            <span className={activeOpt.tw}>
+                                            <Gauge className={`w-3.5 h-3.5 flex-shrink-0 ${activeStyle.tw}`} />
+                                            <span className={activeStyle.tw}>
                                                 Factor ×{extraRate} — cada km en esta zona cuesta {(1 / extraRate).toFixed(1)}× el precio base
                                             </span>
                                         </motion.div>
@@ -406,7 +484,7 @@ export const ZoneModal = ({ isOpen, onClose, onSubmit, initialData, cityCenter, 
                             <div className="px-6 py-4 border-t border-divider flex gap-3">
                                 <Button
                                     type="submit"
-                                    isDisabled={!isReady || name.length < 3}
+                                    isDisabled={!isReady || name.length < 3 || isNaN(parseFloat(extraRateInput)) || parseFloat(extraRateInput) <= 0 || parseFloat(extraRateInput) > 1}
                                     size="lg"
                                     className="flex-[2] h-12 font-black text-white rounded-xl shadow-lg bg-primary shadow-primary/20 cursor-pointer"
                                 >

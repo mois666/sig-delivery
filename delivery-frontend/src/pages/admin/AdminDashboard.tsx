@@ -12,6 +12,15 @@ import { calculateDistance, getAddressFromCoords } from '@/lib/geoUtils';
 import { toast } from 'sonner';
 import { useUserStore } from '@/stores/userStore';
 
+const formatTime = (val: any): string => {
+  if (!val) return '—';
+  try {
+    const d = new Date(val);
+    if (isNaN(d.getTime())) return String(val);
+    return d.toLocaleString('es-BO', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+  } catch { return String(val); }
+};
+
 const AdminDashboard = () => {
   const { orders, removeOrder, fetchOrders, isLoading } = useOrderStore();
   const { rankings } = useRankingStore();
@@ -224,7 +233,7 @@ const AdminDashboard = () => {
 
                     {/* ETA Badge */}
                     <div className="bg-primary/5 px-2 py-1 rounded-lg flex items-center gap-1.5">
-                      <span className="text-[9px] font-black text-muted-foreground">Entrega: {order.delivery_time}</span>
+                      <span className="text-[9px] font-black text-muted-foreground">Entrega: {formatTime(order.delivery_time)}</span>
                       <Clock className="w-3 h-3 text-primary ml-1" />
                       <span className="text-[10px] font-bold text-primary">{order.duration}</span>
                     </div>

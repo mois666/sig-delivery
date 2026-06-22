@@ -15,6 +15,15 @@ const orderTypeConfig: Record<IOrderType, { icon: typeof Package; label: string;
   programada: { icon: Calendar, label: 'Programada', className: 'bg-primary/20 text-primary border-primary/30' },
 };
 
+const formatTime = (val: any): string => {
+  if (!val) return '—';
+  try {
+    const d = new Date(val);
+    if (isNaN(d.getTime())) return String(val);
+    return d.toLocaleString('es-BO', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+  } catch { return String(val); }
+};
+
 const ChallengeCard = ({ order, onAccept }: ChallengeCardProps) => {
   const { icon: TypeIcon, label: typeLabel, className: typeClassName } = orderTypeConfig[order.type];
 
@@ -57,7 +66,7 @@ const ChallengeCard = ({ order, onAccept }: ChallengeCardProps) => {
         )}
         <div className="flex items-center gap-1.5 mt-2 font-bold text-foreground">
           <Calendar className="w-3.5 h-3.5 text-primary" />
-          <span>Entrega: {order.delivery_time}</span>
+          <span>Entrega: {formatTime(order.delivery_time)}</span>
         </div>
       </div>
 

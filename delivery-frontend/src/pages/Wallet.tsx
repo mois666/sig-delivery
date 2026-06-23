@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Wallet as WalletIcon, Star, ArrowUpRight, Clock, Filter } from 'lucide-react';
 import { useWalletStore, TransactionType } from '@/stores/walletStore';
+import { useAuthStore } from '@/stores/authStore';
 import TransactionItem from '@/components/TransactionItem';
 
 import { Button } from '@heroui/react';
@@ -19,8 +20,15 @@ const filterLabels: Record<FilterType, string> = {
 };
 
 const Wallet = () => {
-  const { balance, pendingBalance, totalPoints, transactions } = useWalletStore();
+  const { user } = useAuthStore();
+  const { balance, pendingBalance, totalPoints, transactions, fetchWallet } = useWalletStore();
   const [filter, setFilter] = useState<FilterType>('all');
+
+  useEffect(() => {
+    if (user?.id) {
+      fetchWallet(Number(user.id));
+    }
+  }, [user?.id]);
 
   const filteredTransactions = filter === 'all'
     ? transactions

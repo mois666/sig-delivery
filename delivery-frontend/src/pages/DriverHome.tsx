@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Wifi, WifiOff, Star, Zap } from 'lucide-react';
+import { Wifi, WifiOff, Star, Zap, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { socket } from '@/lib/socket';
+import { appDB } from '@/api/appDB';
 
 // Stores e Interfaces
 import { useAuthStore } from '@/stores/authStore';
@@ -62,11 +63,45 @@ const DriverHome = () => {
   const [isStartLoading, setIsStartLoading] = useState(false);
   const [isAbortLoading, setIsAbortLoading] = useState(false);
 
-  // 1. Monitorear conexión y cargar datos iniciales
+  // Historial de entregas
+  const [completedDeliveries, setCompletedDeliveries] = useState<any[]>([]);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(false);
+
+  const loadCompletedDeliveries = async () => {
+    if (!user?.id) return;
+    setIsHistoryLoading(true);
+    try {
+      const { data } = await appDB.get(`/users/${user.id}/deliveries`);
+      if (data && data.deliveries) {
+        setCompletedDeliveries(data.deliveries);
+      }
+    } catch (err) {
+      console.error('Error al recuperar historial de entregas:', err);
+    } finally {
+      setIsHistoryLoading(false);
+    }
+  };
+
+  // 1. Monitorear conexión y cargar datos iniciales de la base de datos
   useEffect(() => {
     initConnectionListener();
     fetchAvailableOrders();
-  }, []);
+
+    const loadUserProfile = async () => {
+      if (!user?.id) return;
+      try {
+        const { data } = await appDB.get(`/users/${user.id}`);
+        if (data && data.user) {
+          updateUser(data.user);
+        }
+      } catch (err) {
+        console.error('Error al recuperar datos del conductor:', err);
+      }
+    };
+
+    loadUserProfile();
+    loadCompletedDeliveries();
+  }, [user?.id]);
 
   // 2. Auto-abrir modal si ya hay un pedido activo o pre-asignado al cargar la página
   useEffect(() => {
@@ -181,6 +216,7 @@ const DriverHome = () => {
       if (user) {
         updateUser({ totalPoints: (user.totalPoints ?? 0) + points });
       }
+      loadCompletedDeliveries();
     } catch (error) {
       console.error('Error completing order:', error);
     }
@@ -230,10 +266,10 @@ const DriverHome = () => {
 
           <div className={cn(
             'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-colors',
-            isConnected ? 'bg-success/20 text-success' : 'bg-destructive/20 text-destructive'
+            user?.status === 'active' ? 'bg-success/20 text-success' : 'bg-destructive/20 text-destructive'
           )}>
-            {isConnected ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
-            <span>{isConnected ? 'EN LÍNEA' : 'SIN CONEXIÓN'}</span>
+            {user?.status === 'active' ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
+            <span>{user?.status === 'active' ? 'EN LÍNEA' : 'SIN CONEXIÓN'}</span>
           </div>
         </div>
       </div>
@@ -250,7 +286,7 @@ const DriverHome = () => {
 
         <AnimatePresence mode="popLayout">
           {availableOrders.length > 0 ? (
-            <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {availableOrders.map((order) => (
                 <motion.div
                   key={order.id}
@@ -278,6 +314,78 @@ const DriverHome = () => {
             </motion.div>
           )}
         </AnimatePresence>
+      </div>
+
+      {/* Historial de Entregas Completadas */}
+      <div className="px-4 py-6 border-t border-border/40 mt-6 bg-default-50/50">
+        <div className="flex items-center gap-2 mb-4">
+          <div className="w-8 h-8 rounded-lg bg-success/15 flex items-center justify-center">
+            <CheckCircle className="w-5 h-5 text-success" />
+          </div>
+          <h3 className="font-display text-lg font-semibold text-foreground">Historial de Entregas</h3>
+          <span className="ml-auto text-xs font-bold text-muted-foreground">
+            {completedDeliveries.length} completadas
+          </span>
+        </div>
+
+        {isHistoryLoading ? (
+          <div className="flex justify-center py-8">
+            <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : completedDeliveries.length > 0 ? (
+          <div className="space-y-3">
+            {completedDeliveries.map((assignment) => {
+              const order = assignment.order;
+              if (!order) return null;
+              const completionDate = new Date(assignment.updated_at).toLocaleDateString('es-ES', {
+                day: '2-digit',
+                month: 'short',
+                hour: '2-digit',
+                minute: '2-digit',
+              });
+
+              return (
+                <motion.div
+                  key={assignment.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="glass-card p-4 flex flex-col gap-2 hover:bg-default-100/50 transition-all border border-default-150/40 shadow-sm"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black text-muted-foreground uppercase tracking-widest">
+                      Pedido #{order.id}
+                    </span>
+                    <span className="text-sm font-bold text-success">
+                      +Bs. {Number(order.delivery_fee).toFixed(2)}
+                    </span>
+                  </div>
+
+                  <div className="text-xs space-y-1 text-foreground/80">
+                    <p className="truncate">
+                      <span className="font-bold text-muted-foreground mr-1">De:</span> {order.pickup || order.address_a}
+                    </p>
+                    <p className="truncate">
+                      <span className="font-bold text-muted-foreground mr-1">A:</span> {order.delivery || order.address_b}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center justify-between text-[10px] text-muted-foreground pt-1 border-t border-default-100/50">
+                    <span>{completionDate}</span>
+                    {order.reward_points > 0 && (
+                      <span className="font-semibold text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded">
+                        +{order.reward_points} pts
+                      </span>
+                    )}
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="text-center py-8 glass-card border-dashed">
+            <p className="text-sm text-muted-foreground">Aún no has completado entregas</p>
+          </div>
+        )}
       </div>
 
       {/* ─── Bolita flotante ─────────────────────────────────────────────────── */}

@@ -1,7 +1,8 @@
 import { Link, useLocation } from "react-router-dom";
 import { useAuthStore } from "@/stores/authStore";
-import { LayoutDashboard, Package, Map, ClipboardList, Home, Rocket, Wallet, Trophy, Users, Globe } from "lucide-react";
+import { LayoutDashboard, ClipboardList, Home, Rocket, Wallet, Trophy, Users, Globe } from "lucide-react";
 import { motion } from "framer-motion";
+import { cn } from "@/lib/utils";
 
 export const MobileMenu = () => {
   const location = useLocation();
@@ -21,7 +22,7 @@ export const MobileMenu = () => {
   ];
 
   return (
-    <div className="fixed bottom-4 left-4 right-4 h-16 bg-black/60 backdrop-blur-2xl border border-white/10 rounded-2xl flex items-center justify-around px-2 z-50 shadow-2xl">
+    <div className="fixed bottom-4 left-4 right-4 h-16 bg-background/80 dark:bg-black/55 backdrop-blur-xl border border-default-200/50 dark:border-white/10 rounded-2xl flex items-center justify-around px-2 z-50 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
       {menuItems.map((item) => {
         const isActive = location.pathname === item.path;
         const Icon = item.icon;
@@ -34,16 +35,35 @@ export const MobileMenu = () => {
             {isActive && (
               <motion.div
                 layoutId="mobile-active"
-                className="absolute inset-0 bg-primary/10 rounded-xl mx-1"
-                transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                className="absolute inset-0 bg-primary/8 dark:bg-primary/12 rounded-xl mx-1 border border-primary/20"
+                transition={{ type: "spring", stiffness: 350, damping: 28 }}
               />
             )}
-            <Icon className={`w-5 h-5 mb-1 transition-all duration-300 ${isActive ? "text-primary scale-110" : "text-white/40 group-hover:text-white"
-              }`} />
-            <span className={`text-[9px] font-black uppercase tracking-tighter transition-all duration-300 ${isActive ? "text-primary" : "text-white/30 group-hover:text-white/60"
-              }`}>
-              {item.name}
-            </span>
+            
+            <motion.div
+              animate={{ y: isActive ? -2 : 0 }}
+              transition={{ type: "spring", stiffness: 300, damping: 20 }}
+              className="flex flex-col items-center justify-center relative z-10"
+            >
+              <Icon 
+                className={cn(
+                  "w-5 h-5 mb-0.5 transition-all duration-300",
+                  isActive 
+                    ? "text-primary scale-110 drop-shadow-[0_0_6px_rgba(0,112,240,0.4)]" 
+                    : "text-muted-foreground/60 group-hover:text-foreground"
+                )} 
+              />
+              <span 
+                className={cn(
+                  "text-[9px] font-black uppercase tracking-wider transition-all duration-300",
+                  isActive 
+                    ? "text-primary font-black" 
+                    : "text-muted-foreground/50 group-hover:text-muted-foreground"
+                )}
+              >
+                {item.name}
+              </span>
+            </motion.div>
           </Link>
         );
       })}

@@ -24,8 +24,27 @@ const formatTime = (val: any): string => {
   } catch { return String(val); }
 };
 
+const statusConfig: Record<string, { label: string; className: string }> = {
+  pending: { label: 'Pendiente', className: 'bg-warning/15 text-warning border-warning/20' },
+  active: { label: 'Activo', className: 'bg-success/15 text-success border-success/20' },
+  available: { label: 'Disponible', className: 'bg-success/15 text-success border-success/20' },
+  'pre-assigned': { label: 'Pre-asignado', className: 'bg-secondary/15 text-secondary border-secondary/20' },
+  assigned: { label: 'Asignado', className: 'bg-primary/15 text-primary border-primary/20' },
+  accepted: { label: 'Aceptado', className: 'bg-primary/15 text-primary border-primary/20' },
+  collected: { label: 'Recolectado', className: 'bg-secondary/15 text-secondary border-secondary/20' },
+  running: { label: 'En Ruta', className: 'bg-primary/15 text-primary border-primary/20' },
+  on_the_way: { label: 'En Camino', className: 'bg-primary/15 text-primary border-primary/20' },
+  arrived: { label: 'Llegó', className: 'bg-success/15 text-success border-success/20' },
+  delivered: { label: 'Entregado', className: 'bg-success/15 text-success border-success/20' },
+  'not-delivered': { label: 'No Entregado', className: 'bg-danger/15 text-danger border-danger/20' },
+  canceled: { label: 'Cancelado', className: 'bg-danger/15 text-danger border-danger/20' },
+  cancelled: { label: 'Cancelado', className: 'bg-danger/15 text-danger border-danger/20' },
+};
+
 const ChallengeCard = ({ order, onAccept }: ChallengeCardProps) => {
   const { icon: TypeIcon, label: typeLabel, className: typeClassName } = orderTypeConfig[order.type];
+  const statusKey = order.status?.toLowerCase() || 'pending';
+  const statusInfo = statusConfig[statusKey] || { label: order.status || 'Pendiente', className: 'bg-default-100 text-default-500 border-default-200' };
 
   return (
     <motion.div
@@ -43,6 +62,12 @@ const ChallengeCard = ({ order, onAccept }: ChallengeCardProps) => {
             <TypeIcon className="w-4 h-4" />
             <span className="text-xs font-semibold">{typeLabel}</span>
           </div>
+          <span className={cn(
+            "text-[9px] font-black uppercase px-2 py-1 rounded-full tracking-wider border",
+            statusInfo.className
+          )}>
+            {statusInfo.label}
+          </span>
         </div>
         <div className="flex items-center gap-1 text-muted-foreground">
           <Clock className="w-4 h-4" />

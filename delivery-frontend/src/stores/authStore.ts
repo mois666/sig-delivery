@@ -17,6 +17,7 @@ export interface User {
   level?: number;
   totalPoints?: number;
   transport_type?: string;
+  status?: string;
 }
 
 interface AuthState {
@@ -30,6 +31,7 @@ interface AuthState {
   setAuth:   (user: User, token: string) => void;
   logout:    () => void;
   clearError: () => void;
+  updateUser: (user: Partial<User>) => void;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -41,12 +43,31 @@ export const useAuthStore = create<AuthState>()(
       isLoading:       false,
       error:           null,
 
-      setAuth: (user, token) => set({
-        user,
-        accessToken:     token,
-        isAuthenticated: true,
-        isLoading:       false,
-        error:           null,
+      setAuth: (user, token) => {
+        const mappedUser: User = {
+          ...user,
+          totalPoints: user.totalPoints ?? (user as any).points ?? 0,
+          level: user.level ?? Math.floor(((user as any).points ?? 0) / 500) + 1,
+        };
+        set({
+          user: mappedUser,
+          accessToken:     token,
+          isAuthenticated: true,
+          isLoading:       false,
+          error:           null,
+        });
+      },
+
+      updateUser: (updatedFields) => set((state) => {
+        if (!state.user) return {};
+        const newUser = {
+          ...state.user,
+          ...updatedFields,
+        };
+        const points = (newUser as any).points ?? newUser.totalPoints ?? 0;
+        newUser.totalPoints = points;
+        newUser.level = Math.floor(points / 500) + 1;
+        return { user: newUser };
       }),
 
       login: async ({ phone, pin, city_id }) => {

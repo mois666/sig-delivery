@@ -2,10 +2,6 @@ import { Request, Response } from 'express';
 import prisma from '../../../lib/prisma';
 import bcrypt from 'bcryptjs';
 
-const USER_INCLUDE = {
-  wallet: true,
-} as const;
-
 /** Rango de fechas para filtro de ranking */
 const getPeriodRange = (period: string): { gte: Date; lte: Date } => {
   const now = new Date();
@@ -24,10 +20,23 @@ export class UserController {
   static async index(req: Request, res: Response) {
     try {
       const users = await prisma.user.findMany({
-        include: { wallet: true },
         orderBy: { created_at: 'desc' },
       });
-      return res.json(users);
+
+      const userIds = users.map((u) => u.id);
+      const wallets = await prisma.wallet.findMany({
+        where: { user_id: { in: userIds } },
+      });
+
+      const usersWithWallet = users.map((u) => {
+        const wallet = wallets.find((w) => w.user_id === u.id);
+        return {
+          ...u,
+          wallet: wallet || null,
+        };
+      });
+
+      return res.json(usersWithWallet);
     } catch (error) {
       return res.status(500).json({ message: 'Error al obtener usuarios' });
     }
@@ -48,12 +57,14 @@ export class UserController {
           role,
           status,
         },
-        include: USER_INCLUDE,
       });
 
-      await prisma.wallet.create({ data: { user_id: user.id, balance: 0 } });
+      const wallet = await prisma.wallet.create({ data: { user_id: user.id, balance: 0 } });
 
-      return res.status(201).json({ message: 'Usuario creado correctamente', user });
+      return res.status(201).json({
+        message: 'Usuario creado correctamente',
+        user: { ...user, wallet },
+      });
     } catch (error: any) {
       console.error('UserController.store:', error);
       if (error.code === 'P2002') {
@@ -65,17 +76,34 @@ export class UserController {
 
   static async show(req: Request, res: Response) {
     const id = parseInt(req.params.id as string);
+    if (isNaN(id)) {
+      return res.status(400).json({ message: 'ID de usuario inválido' });
+    }
+
+    const currentUser = (req as any).user;
+    if (currentUser.role !== 'admin' && currentUser.role !== 'super_admin' && currentUser.id !== id) {
+      return res.status(403).json({ message: 'Acceso denegado: permisos insuficientes' });
+    }
+
     try {
-      const user = await prisma.user.findUnique({ where: { id }, include: USER_INCLUDE });
+      const user = await prisma.user.findUnique({ where: { id } });
       if (!user) return res.status(404).json({ message: 'Usuario no encontrado' });
-      return res.json({ user, wallet: user.wallet });
+
+      const wallet = await prisma.wallet.findUnique({ where: { user_id: id } });
+
+      return res.json({ user, wallet });
     } catch (error) {
+      console.error('UserController.show error:', error);
       return res.status(500).json({ message: 'Error al obtener usuario' });
     }
   }
 
   static async update(req: Request, res: Response) {
-    const id   = parseInt(req.params.id as string);
+    const id = parseInt(req.params.id as string);
+    if (isNaN(id)) {
+      return res.status(400).json({ message: 'ID de usuario inválido' });
+    }
+
     const data = { ...req.body };
 
     // Eliminar city_id si viene por error en el body
@@ -92,9 +120,14 @@ export class UserController {
       const user = await prisma.user.update({
         where: { id },
         data,
-        include: USER_INCLUDE,
       });
-      return res.json({ message: 'Usuario actualizado con éxito', user });
+
+      const wallet = await prisma.wallet.findUnique({ where: { user_id: id } });
+
+      return res.json({
+        message: 'Usuario actualizado con éxito',
+        user: { ...user, wallet },
+      });
     } catch (error) {
       return res.status(500).json({ message: 'Error al actualizar usuario' });
     }
@@ -102,7 +135,14 @@ export class UserController {
 
   static async destroy(req: Request, res: Response) {
     const id = parseInt(req.params.id as string);
+    if (isNaN(id)) {
+      return res.status(400).json({ message: 'ID de usuario inválido' });
+    }
+
     try {
+      // Eliminar manualmente la billetera del usuario por falta de cascada física en BD
+      await prisma.wallet.deleteMany({ where: { user_id: id } });
+
       await prisma.user.delete({ where: { id } });
       return res.json({ message: 'Usuario eliminado' });
     } catch (error) {
@@ -130,29 +170,40 @@ export class UserController {
       // Obtener los drivers con mayor cantidad de puntos en el período
       const drivers = await prisma.user.findMany({
         where: { role: 'driver' },
-        include: {
-          wallet: true,
-          assignments: {
-            where: {
-              status: 'delivered',
-              created_at: range,
-            },
-          },
-        },
         orderBy: { points: 'desc' },
         take: 10,
       });
 
-      const ranking = drivers.map((d, index) => ({
-        id: String(d.id),
-        name: d.name,
-        points: d.points,
-        deliveries: d.assignments.length,
-        level: 1,
-        rank: index + 1,
-        balance: d.wallet?.balance ?? 0,
-        trend: 'same' as const,
-      }));
+      const driverIds = drivers.map((d) => d.id);
+
+      // Consultar billeteras de forma independiente
+      const wallets = await prisma.wallet.findMany({
+        where: { user_id: { in: driverIds } },
+      });
+
+      // Consultar entregas realizadas en el rango
+      const assignments = await prisma.orderAssignment.findMany({
+        where: {
+          user_id: { in: driverIds },
+          status: 'delivered',
+          created_at: range,
+        },
+      });
+
+      const ranking = drivers.map((d, index) => {
+        const wallet = wallets.find((w) => w.user_id === d.id);
+        const driverAssignments = assignments.filter((a) => a.user_id === d.id);
+        return {
+          id: String(d.id),
+          name: d.name,
+          points: d.points,
+          deliveries: driverAssignments.length,
+          level: 1,
+          rank: index + 1,
+          balance: wallet ? Number(wallet.balance) : 0,
+          trend: 'same' as const,
+        };
+      });
 
       return res.json(ranking);
     } catch (error) {
@@ -166,20 +217,29 @@ export class UserController {
     try {
       const drivers = await prisma.user.findMany({
         where: { role: 'driver' },
-        include: { wallet: true },
         orderBy: { points: 'desc' },
       });
 
-      const result = drivers.map((d) => ({
-        id: d.id,
-        name: d.name,
-        phone: d.phone,
-        points: d.points,
-        level: 1,
-        status: d.status,
-        balance: d.wallet?.balance ?? 0,
-        wallet_id: d.wallet?.id ?? null,
-      }));
+      const driverIds = drivers.map((d) => d.id);
+
+      // Consultar billeteras de forma independiente
+      const wallets = await prisma.wallet.findMany({
+        where: { user_id: { in: driverIds } },
+      });
+
+      const result = drivers.map((d) => {
+        const wallet = wallets.find((w) => w.user_id === d.id);
+        return {
+          id: d.id,
+          name: d.name,
+          phone: d.phone,
+          points: d.points,
+          level: 1,
+          status: d.status,
+          balance: wallet ? Number(wallet.balance) : 0,
+          wallet_id: wallet ? wallet.id : null,
+        };
+      });
 
       return res.json(result);
     } catch (error) {
@@ -190,6 +250,15 @@ export class UserController {
   /** Historial de transacciones de un conductor */
   static async getDriverTransactions(req: Request, res: Response) {
     const id = parseInt(req.params.id as string);
+    if (isNaN(id)) {
+      return res.status(400).json({ message: 'ID de usuario inválido' });
+    }
+
+    const currentUser = (req as any).user;
+    if (currentUser.role !== 'admin' && currentUser.role !== 'super_admin' && currentUser.id !== id) {
+      return res.status(403).json({ message: 'Acceso denegado: permisos insuficientes' });
+    }
+
     try {
       const wallet = await prisma.wallet.findUnique({
         where: { user_id: id },
@@ -205,6 +274,38 @@ export class UserController {
       return res.json({ wallet_id: wallet.id, balance: wallet.balance, transactions: wallet.transactions });
     } catch (error) {
       return res.status(500).json({ message: 'Error al obtener transacciones' });
+    }
+  }
+
+  static async getDriverDeliveries(req: Request, res: Response) {
+    const id = parseInt(req.params.id as string);
+    if (isNaN(id)) {
+      return res.status(400).json({ message: 'ID de usuario inválido' });
+    }
+
+    const currentUser = (req as any).user;
+    if (currentUser.role !== 'admin' && currentUser.role !== 'super_admin' && currentUser.id !== id) {
+      return res.status(403).json({ message: 'Acceso denegado: permisos insuficientes' });
+    }
+
+    try {
+      const deliveries = await prisma.orderAssignment.findMany({
+        where: {
+          user_id: id,
+          status: 'delivered',
+        },
+        include: {
+          order: true,
+        },
+        orderBy: {
+          created_at: 'desc',
+        },
+      });
+
+      return res.json({ deliveries });
+    } catch (error) {
+      console.error('getDriverDeliveries:', error);
+      return res.status(500).json({ message: 'Error al obtener historial de entregas' });
     }
   }
 }

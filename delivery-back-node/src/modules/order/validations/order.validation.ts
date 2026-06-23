@@ -12,7 +12,7 @@ export const orderStoreSchema = z.object({
     delivery_fee:  z.coerce.number().nonnegative(),
     description:   z.string().optional().nullable(),
     currency:      z.string().optional().default('BOB'),
-    status:        z.string().optional().default('pending'),
+    status:        z.string().optional().default('active'),
     duration:      z.string().optional().nullable(),
     reward_points: z.coerce.number().optional().default(0),
     city_id:       z.coerce.number().int().positive('La ciudad es requerida'),

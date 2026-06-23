@@ -1,10 +1,16 @@
 "use client";
 
-import { Avatar, Dropdown, Button, Description, Header, Kbd, Label, Separator, Badge } from "@heroui/react";
+import { useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { Avatar, Button, Badge, Dropdown, Description, Header, Label, Separator, Kbd } from "@heroui/react";
+import { Bars, Pencil, SquarePlus, TrashBin } from "@gravity-ui/icons";
 import { useAuthStore } from "@/stores/authStore";
 import { useSocketStore } from "@/stores/socketStore";
-import { Bell, Search, Settings, LogOut, User, Bike, Menu, Sun, Moon } from "lucide-react";
-import { motion } from "framer-motion";
+import {
+  Bell, Search, LogOut, User, Bike, Sun, Moon,
+  LayoutDashboard, ClipboardList, Home, Rocket, Wallet, Trophy, Users, Globe
+} from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { useTheme } from "next-themes";
 
@@ -12,24 +18,42 @@ export const TopNavbar = () => {
   const { user, logout, isAuthenticated } = useAuthStore();
   const { theme, setTheme } = useTheme();
   const { isConnected } = useSocketStore();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
+
+  const mobileMenuItems = isAdmin ? [
+    { name: "Dashboard", path: "/admin", icon: LayoutDashboard },
+    { name: "Usuarios", path: "/users", icon: Users },
+    { name: "Ciudades", path: "/cities", icon: Globe },
+    { name: "Pedidos", path: "/orders", icon: ClipboardList },
+    { name: "Billetera", path: "/user-wallets", icon: Wallet },
+    { name: "Ranking", path: "/ranking", icon: Trophy },
+  ] : [
+    { name: "Inicio", path: "/home", icon: Home },
+    { name: "Entrega Activa", path: "/active-delivery", icon: Rocket },
+    { name: "Billetera", path: "/wallet", icon: Wallet },
+    { name: "Ranking", path: "/ranking", icon: Trophy },
+  ];
 
   return (
-    <header className="sticky top-0 z-[40] w-full h-16 bg-background/80 backdrop-blur-md border-b border-divider transition-all duration-300">
+    <header className="sticky top-0 z-[50] w-full h-16 bg-background/80 backdrop-blur-md border-b border-divider transition-all duration-300">
       <div className="h-full max-w-[1920px] mx-auto px-4 md:px-6 flex items-center justify-between gap-4">
 
         {/* Left Section: Logo & Search */}
         <div className="flex items-center gap-4 md:gap-8 flex-1">
-          <div className="flex items-center gap-2 cursor-pointer">
+          <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate(isAdmin ? '/admin' : '/home')}>
             <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-              <Bike className="w-5 h-5" />
+              <Bike className="w-5 h-5 text-white" />
             </div>
-            <div className="hidden sm:flex flex-col leading-none">
-              <span className="text-lg font-black font-display text-foreground tracking-tighter uppercase">
-                {isAuthenticated && user?.city?.name ? user.city.name : (import.meta.env.VITE_NAME_APP || 'Depedidos')}
+            <div className="flex flex-col leading-none">
+              <span className="text-sm md:text-lg font-black font-display text-foreground tracking-tighter uppercase">
+                {import.meta.env.VITE_NAME_APP || 'Depedidos'}
               </span>
               {isAuthenticated && user?.city?.name && (
-                <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">
-                  {import.meta.env.VITE_NAME_APP || 'Depedidos'}
+                <span className="text-[9px] md:text-[10px] text-muted-foreground font-bold uppercase tracking-widest">
+                  {user.city.name}
                 </span>
               )}
             </div>
@@ -74,82 +98,104 @@ export const TopNavbar = () => {
             </Badge>
           </Badge.Anchor>
 
-          {/* User Profile */}
+          {/* User Profile - Redirige a /profile en click */}
+          <button
+            onClick={() => navigate('/profile')}
+            className="flex items-center gap-2 p-1 rounded-full hover:bg-default-100 transition-all outline-none"
+            aria-label="Perfil"
+          >
+            <div className="relative flex-shrink-0">
+              <Avatar className="w-8 h-8" color="primary">
+                <Avatar.Fallback>
+                  <User className="w-4 h-4" />
+                </Avatar.Fallback>
+              </Avatar>
+              <span
+                className={cn(
+                  "absolute right-0 bottom-0 size-2.5 rounded-full ring-2 ring-background",
+                  isConnected ? "bg-green-500" : "bg-red-500"
+                )}
+              />
+            </div>
+          </button>
+
+          {/* Dropdown de opciones de cuenta y navegación en móviles */}
           <Dropdown>
-            <button className="flex items-center gap-2 p-1 rounded-full hover:bg-default-100 transition-all outline-none">
-              <div className="relative flex-shrink-0">
-                <Avatar className="w-8 h-8" color="primary">
-                  <Avatar.Fallback>
-                    <User className="w-4 h-4" />
-                  </Avatar.Fallback>
-                </Avatar>
-                <span
-                  className={cn(
-                    "absolute right-0 bottom-0 size-2.5 rounded-full ring-2 ring-background",
-                    isConnected ? "bg-green-500" : "bg-red-500"
-                  )}
-                />
-              </div>
-              <div className="hidden sm:flex flex-col items-start mr-2">
-                <span className="text-xs font-bold text-foreground leading-none">{user?.name}</span>
-                <span className="text-[10px] text-muted-foreground uppercase font-black tracking-wider">
-                  {user?.role}
-                </span>
-              </div>
-            </button>
-
-            <Dropdown.Popover className="min-w-[200px] bg-content1 border border-divider rounded-2xl p-2 shadow-xl">
-              <Dropdown.Menu onAction={(key) => console.log(key)}>
+            <Button isIconOnly aria-label="Menu" variant="secondary" className="md:hidden text-muted-foreground">
+              <Bars className="outline-none" />
+            </Button>
+            <Dropdown.Popover className="min-w-[220px]">
+              <Dropdown.Menu
+                onAction={(key) => {
+                  if (key === 'profile') navigate('/profile');
+                  else if (key === 'logout') logout();
+                  else if (typeof key === 'string' && key.startsWith('/')) navigate(key);
+                }}
+              >
                 <Dropdown.Section>
-                  <Header className="text-[10px] font-black text-primary uppercase tracking-widest px-2 pb-2">Cuenta</Header>
-                  <Dropdown.Item id="user-info" textValue="user info">
+                  <Header>Cuenta</Header>
+                  <Dropdown.Item id="user-info" textValue={user?.name || "Usuario"}>
                     <div className="flex flex-col">
-                      <Label className="text-foreground font-bold">{user?.name}</Label>
-                      <Description className="text-muted-foreground text-[10px]">{user?.email}</Description>
+                      <Label>{user?.name}</Label>
+                      <Description>{user?.email || 'Sin correo registrado'}</Description>
                     </div>
                   </Dropdown.Item>
                 </Dropdown.Section>
-
-                <Separator className="bg-divider my-2" />
-
+                <Separator />
                 <Dropdown.Section>
-                  <Dropdown.Item id="profile" textValue="Perfil" href="/profile">
-                    <div className="flex items-center gap-2">
-                      <User className="w-4 h-4 text-primary" />
-                      <Label className="text-foreground">Perfil</Label>
+                  <Header>Navegación</Header>
+                  {mobileMenuItems.map((item) => {
+                    const Icon = item.icon;
+                    return (
+                      <Dropdown.Item key={item.path} id={item.path} textValue={item.name}>
+                        <div className="flex h-8 items-start justify-center pt-px">
+                          <Icon className="size-4 shrink-0 text-muted" />
+                        </div>
+                        <div className="flex flex-col">
+                          <Label>{item.name}</Label>
+                        </div>
+                      </Dropdown.Item>
+                    );
+                  })}
+                </Dropdown.Section>
+                <Separator />
+                <Dropdown.Section>
+                  <Header>Acciones</Header>
+                  <Dropdown.Item id="profile" textValue="Perfil">
+                    <div className="flex h-8 items-start justify-center pt-px">
+                      <Pencil className="size-4 shrink-0 text-muted" />
                     </div>
-                  </Dropdown.Item>
-                  <Dropdown.Item id="settings" textValue="Configuración">
-                    <div className="flex items-center gap-2">
-                      <Settings className="w-4 h-4 text-muted-foreground" />
-                      <Label className="text-foreground">Ajustes</Label>
+                    <div className="flex flex-col">
+                      <Label>Perfil</Label>
+                      <Description>Ver mis datos y nivel</Description>
                     </div>
+                    <Kbd className="ms-auto" slot="keyboard" variant="light">
+                      <Kbd.Abbr keyValue="command" />
+                      <Kbd.Content>P</Kbd.Content>
+                    </Kbd>
                   </Dropdown.Item>
                 </Dropdown.Section>
-
-                <Separator className="bg-divider my-2" />
-
+                <Separator />
                 <Dropdown.Section>
-                  <Dropdown.Item
-                    id="logout"
-                    textValue="Salir"
-                    variant="danger"
-                    onPress={logout}
-                    className="text-danger"
-                  >
-                    <div className="flex items-center gap-2">
-                      <LogOut className="w-4 h-4" />
+                  <Header>Zona de peligro</Header>
+                  <Dropdown.Item id="logout" textValue="Cerrar Sesión" variant="danger">
+                    <div className="flex h-8 items-start justify-center pt-px">
+                      <TrashBin className="size-4 shrink-0 text-danger" />
+                    </div>
+                    <div className="flex flex-col">
                       <Label>Cerrar Sesión</Label>
+                      <Description>Finalizar sesión actual</Description>
                     </div>
+                    <Kbd className="ms-auto" slot="keyboard" variant="light">
+                      <Kbd.Abbr keyValue="command" />
+                      <Kbd.Abbr keyValue="shift" />
+                      <Kbd.Content>Q</Kbd.Content>
+                    </Kbd>
                   </Dropdown.Item>
                 </Dropdown.Section>
               </Dropdown.Menu>
             </Dropdown.Popover>
           </Dropdown>
-
-          <Button isIconOnly variant="light" className="md:hidden text-muted-foreground">
-            <Menu className="w-5 h-5" />
-          </Button>
         </div>
 
       </div>

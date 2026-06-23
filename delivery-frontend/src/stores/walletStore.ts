@@ -2,6 +2,7 @@ import { appDB } from '@/api/appDB';
 import axios from 'axios';
 import { toast } from 'sonner';
 import { create } from 'zustand';
+import { useAuthStore } from './authStore';
 
 export type TransactionType = 'earning' | 'bonus' | 'commission' | 'withdrawal' | 'points';
 
@@ -23,6 +24,7 @@ interface WalletState {
   addTransaction: (transaction: Omit<Transaction, 'id' | 'createdAt'>) => void;
   updateBalance: (amount: number) => void;
   updatePoints: (points: number) => void;
+  fetchWallet: (userId: number) => Promise<void>;
 }
 
 // Mock transactions
@@ -125,5 +127,45 @@ export const useWalletStore = create<WalletState>((set) => ({
 
   updatePoints: (points) => {
     set((state) => ({ totalPoints: state.totalPoints + points }));
+  },
+
+  fetchWallet: async (userId: number) => {
+    try {
+      const { data: walletData } = await appDB.get(`/users/${userId}/transactions`);
+      const { data: userData } = await appDB.get(`/users/${userId}`);
+
+      const mappedTransactions: Transaction[] = (walletData.transactions || []).map((t: any) => {
+        let mappedType: TransactionType = 'earning';
+        if (t.type === 'withdrawal') mappedType = 'withdrawal';
+        else if (t.type === 'bonus') mappedType = 'bonus';
+        else if (t.type === 'commission') mappedType = 'commission';
+        else if (t.type === 'points') mappedType = 'points';
+        else if (t.type === 'deposit') mappedType = 'earning';
+        else if (t.type === 'payment') mappedType = 'commission';
+
+        return {
+          id: String(t.id),
+          type: mappedType,
+          amount: Number(t.amount),
+          description: t.reference || t.metadata?.description || 'Transacción de billetera',
+          orderId: t.metadata?.orderId ? String(t.metadata.orderId) : undefined,
+          createdAt: new Date(t.created_at),
+        };
+      });
+
+      const points = userData.user?.points ?? 0;
+
+      // Actualizar en authStore
+      useAuthStore.getState().updateUser({ totalPoints: points });
+
+      set({
+        balance: Number(walletData.balance) || 0,
+        pendingBalance: 0,
+        totalPoints: points,
+        transactions: mappedTransactions,
+      });
+    } catch (error) {
+      console.error('Error al obtener datos de billetera:', error);
+    }
   },
 }));
